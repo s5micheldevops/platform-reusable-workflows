@@ -1,0 +1,29 @@
+name: Security - Gitleaks
+
+# Copy this file into an application repository at:
+# .github/workflows/security-gitleaks.yml
+#
+# Replace YOUR_GITHUB_USERNAME_OR_ORG with the real GitHub owner that hosts
+# platform-reusable-workflows.
+#
+# This caller workflow lives in the application repository.
+# The reusable workflow lives in platform-reusable-workflows.
+# The application repository does not need to copy the full Gitleaks logic.
+
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  gitleaks:
+    name: Call reusable Gitleaks workflow
+    uses: YOUR_GITHUB_USERNAME_OR_ORG/platform-reusable-workflows/.github/workflows/reusable-gitleaks.yml@main
+    with:
+      fetch_depth: 0
+      fail_on_error: true
+      redact: true

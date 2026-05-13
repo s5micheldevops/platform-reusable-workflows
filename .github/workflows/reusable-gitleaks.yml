@@ -1,0 +1,71 @@
+name: Reusable - Gitleaks Secret Scan
+
+on:
+  workflow_call:
+    inputs:
+      fetch_depth:
+        type: number
+        required: false
+        default: 0
+        description: "Git fetch depth. Use 0 to scan full history."
+      fail_on_error:
+        type: boolean
+        required: false
+        default: true
+        description: "Fail the job when Gitleaks detects secrets."
+      redact:
+        type: boolean
+        required: false
+        default: true
+        description: "Redact detected secrets from logs."
+
+permissions:
+  contents: read
+
+jobs:
+  gitleaks-secret-scan:
+    name: Gitleaks Secret Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout caller repository
+        uses: actions/checkout@v4
+        with:
+          # The caller repository is the application, website, or infrastructure repo being scanned.
+          fetch-depth: ${{ inputs.fetch_depth }}
+
+      - name: Resolve platform workflow source
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # Example GITHUB_WORKFLOW_REF:
+          # owner/platform-reusable-workflows/.github/workflows/reusable-gitleaks.yml@main
+          workflow_ref="${GITHUB_WORKFLOW_REF}"
+          platform_repository="${workflow_ref%%/.github/workflows/*}"
+          platform_ref="${workflow_ref##*@}"
+
+          if [[ -z "${platform_repository}" || -z "${platform_ref}" || "${workflow_ref}" != *@* ]]; then
+            echo "Unable to resolve platform repository and ref from GITHUB_WORKFLOW_REF."
+            echo "GITHUB_WORKFLOW_REF=${workflow_ref}"
+            exit 1
+          fi
+
+          echo "PLATFORM_REPOSITORY=${platform_repository}" >> "${GITHUB_ENV}"
+          echo "PLATFORM_REF=${platform_ref}" >> "${GITHUB_ENV}"
+
+      - name: Checkout platform reusable workflows repository
+        uses: actions/checkout@v4
+        with:
+          # The platform repository contains the composite action used by this reusable workflow.
+          repository: ${{ env.PLATFORM_REPOSITORY }}
+          ref: ${{ env.PLATFORM_REF }}
+          path: .platform-reusable-workflows
+          fetch-depth: 1
+
+      - name: Run platform Gitleaks composite action
+        uses: ./.platform-reusable-workflows/actions/gitleaks-scan
+        with:
+          fetch_depth: ${{ inputs.fetch_depth }}
+          fail_on_error: ${{ inputs.fail_on_error }}
+          redact: ${{ inputs.redact }}

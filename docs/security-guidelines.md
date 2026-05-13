@@ -125,9 +125,31 @@ Application repo
   -> Gitleaks scan
 ```
 
-In a future phase, reusable workflows will call the Gitleaks composite action. Application repositories should call the reusable workflow, not duplicate the scan logic.
+Phase 1 created the composite action:
+
+```text
+actions/gitleaks-scan/action.yml
+```
+
+Phase 2 connects that action to a reusable workflow:
+
+```text
+.github/workflows/reusable-gitleaks.yml
+```
+
+Application repositories should call the reusable workflow, not duplicate the scan logic.
 
 The caller workflow or reusable workflow should handle `actions/checkout`. The composite action focuses only on validating inputs and running the scan.
+
+Beginner explanation:
+
+- The application repository contains the code being scanned.
+- The caller workflow is a short workflow file inside the application repository.
+- The reusable workflow lives in this platform repository and defines the shared job.
+- The composite action lives in this platform repository and wraps the Gitleaks scan step.
+- Gitleaks performs the actual secret scan.
+
+The reusable workflow checks out both the caller repository and this platform repository. It needs the caller repository so there is code to scan, and it needs the platform repository so it can access the local composite action.
 
 ### What The Gitleaks Action Does Not Do
 
