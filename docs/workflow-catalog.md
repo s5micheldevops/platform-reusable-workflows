@@ -4,6 +4,8 @@ This catalog will track reusable workflows as they are added.
 
 Phase 0 creates the catalog, but no reusable workflows are implemented yet.
 
+Phase 1 adds a composite action for Gitleaks secret scanning. It is not a reusable workflow yet.
+
 ## Planned Workflows
 
 | Workflow | Intended File | Purpose | Status |
@@ -13,6 +15,12 @@ Phase 0 creates the catalog, but no reusable workflows are implemented yet.
 | Docker Build | `.github/workflows/docker-build.yml` | Build and optionally publish Docker images. | Planned |
 | Terraform Plan | `.github/workflows/terraform-plan.yml` | Run formatting, validation, and plan checks. | Planned |
 | Kubernetes Validate | `.github/workflows/kubernetes-validate.yml` | Validate manifests and deployment configuration. | Planned |
+
+## Composite Actions
+
+| Action | Path | Purpose | Status |
+| --- | --- | --- | --- |
+| Platform Gitleaks Scan | `actions/gitleaks-scan/action.yml` | Run reusable secret scanning for checked-out GitHub repositories. | Added |
 
 ## Workflow Selection Guide
 

@@ -1,0 +1,58 @@
+name: "Platform Gitleaks Scan"
+description: "Reusable secret scanning composite action for GitHub repositories."
+
+inputs:
+  fail_on_error:
+    description: "Fail the job when Gitleaks detects secrets."
+    required: false
+    default: "true"
+  fetch_depth:
+    description: "Git fetch depth used by the caller workflow. Use 0 for full history scanning."
+    required: false
+    default: "0"
+  redact:
+    description: "Redact secrets from logs."
+    required: false
+    default: "true"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Validate Gitleaks scan inputs
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        # Keep input validation inside the action so caller workflows get clear errors.
+        case "${{ inputs.fail_on_error }}" in
+          true|false) ;;
+          *)
+            echo "fail_on_error must be either 'true' or 'false'."
+            exit 1
+            ;;
+        esac
+
+        case "${{ inputs.redact }}" in
+          true|false) ;;
+          *)
+            echo "redact must be either 'true' or 'false'."
+            exit 1
+            ;;
+        esac
+
+    - name: Confirm caller checkout expectation
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        # This composite action does not run actions/checkout.
+        # The caller workflow should checkout the repository before calling this action.
+        echo "Expected caller checkout fetch depth: ${{ inputs.fetch_depth }}"
+        echo "Use fetch-depth: 0 in the caller workflow when full Git history scanning is required."
+
+    - name: Run Gitleaks secret scan
+      uses: gitleaks/gitleaks-action@v2
+      continue-on-error: ${{ inputs.fail_on_error != 'true' }}
+      env:
+        # Redaction keeps detected secret values out of logs when supported by the Gitleaks action.
+        GITLEAKS_REDACT: ${{ inputs.redact }}
