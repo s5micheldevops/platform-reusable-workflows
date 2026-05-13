@@ -104,7 +104,7 @@ for serious repository validation.
 | Layer | Where It Lives | What It Does |
 | --- | --- | --- |
 | Caller workflow | Application repository | Decides when to run and passes inputs. |
-| Reusable workflow | `platform-reusable-workflows/.github/workflows/reusable-gitleaks.yml` | Checks out the caller repository, loads the platform action, and runs the scan. |
+| Reusable workflow | `platform-reusable-workflows/.github/workflows/reusable-gitleaks.yml` | Checks out the caller repository and calls `s5micheldevops/platform-reusable-workflows/actions/gitleaks-scan@main`. |
 | Composite action | `platform-reusable-workflows/actions/gitleaks-scan/action.yml` | Validates inputs and invokes `gitleaks/gitleaks-action@v2`. |
 
 ## Workflow Selection Guide
