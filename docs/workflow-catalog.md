@@ -8,6 +8,8 @@ Phase 1 adds a composite action for Gitleaks secret scanning.
 
 Phase 2 adds a reusable Gitleaks workflow that application repositories can call.
 
+Phase 3 adds a composite action for branch naming validation. It is not a reusable workflow yet.
+
 ## Planned Workflows
 
 | Workflow | Intended File | Purpose | Status |
@@ -24,6 +26,7 @@ Phase 2 adds a reusable Gitleaks workflow that application repositories can call
 | Action | Path | Purpose | Status |
 | --- | --- | --- | --- |
 | Platform Gitleaks Scan | `actions/gitleaks-scan/action.yml` | Run reusable secret scanning for checked-out GitHub repositories. | Added |
+| Validate Branch Name | `actions/validate-branch-name/action.yml` | Validate branch names against the platform naming standard or a custom regex. | Added |
 
 ## Reusable Gitleaks Workflow
 

@@ -1,0 +1,70 @@
+name: "Validate Branch Name"
+description: "Reusable composite action that validates Git branch naming conventions."
+
+inputs:
+  branch_name:
+    description: "Branch name to validate."
+    required: true
+  allowed_regex:
+    description: "Optional custom regex override."
+    required: false
+    default: ""
+
+runs:
+  using: "composite"
+  steps:
+    - name: Validate branch name
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        branch_name="${{ inputs.branch_name }}"
+        custom_regex="${{ inputs.allowed_regex }}"
+
+        # Default standard:
+        # - allows stable environment branches such as main and develop
+        # - allows readable work branches such as feature/add-login-page
+        default_regex='^(main|master|develop|production|((feature|bug|hotfix|chore|docs|ci|refactor|design|release)\/[a-z0-9][a-z0-9._-]*))$'
+        allowed_regex="${custom_regex:-$default_regex}"
+
+        echo "Validating branch name: ${branch_name}"
+
+        if [[ "${branch_name}" =~ ${allowed_regex} ]]; then
+          echo "Branch name is valid."
+          echo "Accepted branch: ${branch_name}"
+          exit 0
+        fi
+
+        echo "Branch name is invalid: ${branch_name}"
+        echo ""
+        echo "Expected format:"
+        echo "- Exact protected or long-lived branches: main, master, develop, production"
+        echo "- Work branches: <type>/<short-readable-description>"
+        echo ""
+        echo "Allowed work branch types:"
+        echo "- feature/"
+        echo "- bug/"
+        echo "- hotfix/"
+        echo "- chore/"
+        echo "- docs/"
+        echo "- ci/"
+        echo "- refactor/"
+        echo "- design/"
+        echo "- release/"
+        echo ""
+        echo "Valid examples:"
+        echo "- feature/add-computer-support-service"
+        echo "- design/hero-section-refresh"
+        echo "- ci/add-gitleaks-scan"
+        echo "- docs/update-maintenance-guide"
+        echo "- hotfix/fix-email-link"
+        echo ""
+        echo "Invalid examples:"
+        echo "- test123"
+        echo "- jean-work"
+        echo "- random"
+        echo "- mybranch"
+        echo ""
+        echo "Why this matters:"
+        echo "Clear branch names help reviewers understand the work, help CI/CD pipelines make routing decisions, and keep repository history easier to search."
+        exit 1
