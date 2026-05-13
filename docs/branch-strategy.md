@@ -133,7 +133,59 @@ application repo
   -> validate-branch-name composite action
 ```
 
-In a future phase, a reusable workflow will call this composite action. Application repositories will call that reusable workflow instead of copying branch validation logic into every repository.
+Phase 3 created the composite action:
+
+```text
+actions/validate-branch-name/action.yml
+```
+
+Phase 4 connects that action to a reusable workflow:
+
+```text
+.github/workflows/reusable-branch-naming.yml
+```
+
+Application repositories should call the reusable workflow instead of copying branch validation logic into every repository.
+
+Example flow:
+
+```text
+application repo
+  -> caller workflow
+  -> reusable workflow
+  -> validate-branch-name composite action
+```
+
+## Push Vs Pull Request Branch Detection
+
+GitHub Actions exposes branch names differently depending on the event.
+
+For pull requests:
+
+- The source branch is available as `github.head_ref`.
+- This is the branch that the developer is asking to merge.
+
+For push events:
+
+- The pushed branch is available as `github.ref_name`.
+- This is the branch that received the pushed commit.
+
+The reusable branch naming workflow uses this rule:
+
+```text
+pull_request -> github.head_ref
+push         -> github.ref_name
+```
+
+This matters because pull request workflows often run against a merge reference internally, and that merge reference is not the developer's actual branch name.
+
+Additional valid examples:
+
+- `feature/add-service-card`
+- `design/update-hero-layout`
+- `ci/add-security-scan`
+- `docs/update-maintenance-guide`
+- `hotfix/fix-contact-email`
 
 ## Future Extensibility
 

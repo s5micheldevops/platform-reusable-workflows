@@ -1,0 +1,23 @@
+name: Governance - Branch Naming
+
+# Copy this file into an application repository at:
+# .github/workflows/enforce-branch-naming.yml
+#
+# This caller workflow lives in the application repository.
+# The reusable workflow lives in platform-reusable-workflows.
+# The composite action validates the actual branch name detected by GitHub Actions.
+# Projects with custom naming rules can pass allowed_regex to override the default.
+
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  branch-naming:
+    name: Call reusable branch naming workflow
+    uses: s5micheldevops/platform-reusable-workflows/.github/workflows/reusable-branch-naming.yml@main

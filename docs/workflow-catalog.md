@@ -8,7 +8,9 @@ Phase 1 adds a composite action for Gitleaks secret scanning.
 
 Phase 2 adds a reusable Gitleaks workflow that application repositories can call.
 
-Phase 3 adds a composite action for branch naming validation. It is not a reusable workflow yet.
+Phase 3 adds a composite action for branch naming validation.
+
+Phase 4 adds a reusable branch naming workflow that application repositories can call.
 
 ## Planned Workflows
 
@@ -20,6 +22,7 @@ Phase 3 adds a composite action for branch naming validation. It is not a reusab
 | Terraform Plan | `.github/workflows/terraform-plan.yml` | Run formatting, validation, and plan checks. | Planned |
 | Kubernetes Validate | `.github/workflows/kubernetes-validate.yml` | Validate manifests and deployment configuration. | Planned |
 | Gitleaks Secret Scan | `.github/workflows/reusable-gitleaks.yml` | Run Gitleaks secret scanning through the platform composite action. | Added |
+| Branch Naming Validation | `.github/workflows/reusable-branch-naming.yml` | Enforce branch naming standards through the platform composite action. | Added |
 
 ## Composite Actions
 
@@ -106,6 +109,121 @@ for serious repository validation.
 | Caller workflow | Application repository | Decides when to run and passes inputs. |
 | Reusable workflow | `platform-reusable-workflows/.github/workflows/reusable-gitleaks.yml` | Checks out the caller repository and calls `s5micheldevops/platform-reusable-workflows/actions/gitleaks-scan@main`. |
 | Composite action | `platform-reusable-workflows/actions/gitleaks-scan/action.yml` | Validates inputs and invokes `gitleaks/gitleaks-action@v2`. |
+
+## Reusable Branch Naming Workflow
+
+### Purpose
+
+`reusable-branch-naming.yml` provides a central GitHub Actions workflow for branch naming governance. Application repositories call this workflow instead of copying shell scripts or regex rules into every repository.
+
+### When To Use It
+
+Use this workflow for repositories where branch names should be consistent across teams and projects.
+
+Good candidates include:
+
+- Static websites.
+- React and Node applications.
+- Docker projects.
+- Terraform repositories.
+- Kubernetes configuration repositories.
+- Future client repositories.
+
+### How Application Repositories Call It
+
+Application repositories should create a small caller workflow, usually at:
+
+```text
+.github/workflows/enforce-branch-naming.yml
+```
+
+The caller workflow uses `jobs.<job_id>.uses` to call the reusable workflow:
+
+```yaml
+jobs:
+  branch-naming:
+    uses: s5micheldevops/platform-reusable-workflows/.github/workflows/reusable-branch-naming.yml@main
+```
+
+A copy-ready example lives at:
+
+```text
+examples/static-site/enforce-branch-naming.yml
+```
+
+### Inputs
+
+| Input | Type | Default | Purpose |
+| --- | --- | --- | --- |
+| `allowed_regex` | string | `""` | Optional custom regex override for repositories that need different branch naming rules. |
+
+### Default Branch Rules
+
+The default composite action allows these exact branches:
+
+- `main`
+- `master`
+- `develop`
+- `production`
+
+It also allows work branches that start with:
+
+- `feature/`
+- `bug/`
+- `hotfix/`
+- `chore/`
+- `docs/`
+- `ci/`
+- `refactor/`
+- `design/`
+- `release/`
+
+### Valid Examples
+
+- `feature/add-service-card`
+- `design/update-hero-layout`
+- `ci/add-security-scan`
+- `docs/update-maintenance-guide`
+- `hotfix/fix-contact-email`
+
+### Invalid Examples
+
+- `test123`
+- `jean-work`
+- `random`
+- `mybranch`
+- `feature/`
+- `feature/add login`
+
+### What Happens When A Branch Name Fails
+
+The reusable workflow fails the job. The composite action prints the detected branch name, the expected format, and valid examples. The developer should rename or recreate the branch using an accepted name.
+
+### How To Override `allowed_regex`
+
+Some repositories may need ticket IDs or a different naming rule. Those repositories can pass a custom regex:
+
+```yaml
+jobs:
+  branch-naming:
+    uses: s5micheldevops/platform-reusable-workflows/.github/workflows/reusable-branch-naming.yml@main
+    with:
+      allowed_regex: '^(main|develop|feature/[A-Z]+-[0-9]+-[a-z0-9._-]+)$'
+```
+
+Use overrides carefully because they become part of that repository's governance contract.
+
+### Why Branch Naming Matters For CI/CD Governance
+
+CI/CD systems often make decisions based on branch names. A consistent branch strategy can support deployment gates, release automation, hotfix handling, audit trails, and reviewer expectations.
+
+### Caller Workflow vs Reusable Workflow Vs Composite Action
+
+| Layer | Where It Lives | What It Does |
+| --- | --- | --- |
+| Caller workflow | Application repository | Decides when to run branch validation. |
+| Reusable workflow | `platform-reusable-workflows/.github/workflows/reusable-branch-naming.yml` | Detects the branch from GitHub context and calls the branch validation action. |
+| Composite action | `platform-reusable-workflows/actions/validate-branch-name/action.yml` | Applies the default or custom regex and prints pass/fail guidance. |
 
 ## Workflow Selection Guide
 

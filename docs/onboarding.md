@@ -55,6 +55,16 @@ jobs:
     uses: your-github-org/platform-reusable-workflows/.github/workflows/example.yml@main
 ```
 
+For governance checks, a consumer repository can call the reusable branch naming workflow:
+
+```yaml
+jobs:
+  branch-naming:
+    uses: s5micheldevops/platform-reusable-workflows/.github/workflows/reusable-branch-naming.yml@main
+```
+
+The consumer repository controls when the check runs. The reusable workflow controls how the branch name is detected and validated.
+
 ## Maintenance Expectations
 
 - Keep workflow names generic.

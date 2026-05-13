@@ -1,0 +1,48 @@
+name: Reusable - Branch Naming Validation
+
+on:
+  workflow_call:
+    inputs:
+      allowed_regex:
+        type: string
+        required: false
+        default: ""
+        description: "Optional custom regex override for allowed branch names."
+
+permissions:
+  contents: read
+
+jobs:
+  branch-naming-validation:
+    name: Branch Naming Validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Detect branch name
+        id: branch
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # Pull request runs use github.head_ref because the source branch may
+          # be different from the target branch.
+          # Push runs use github.ref_name because that is the pushed branch name.
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            branch_name="${{ github.head_ref }}"
+          else
+            branch_name="${{ github.ref_name }}"
+          fi
+
+          if [[ -z "${branch_name}" ]]; then
+            echo "Unable to detect branch name from GitHub context."
+            exit 1
+          fi
+
+          echo "Detected branch name: ${branch_name}"
+          echo "branch_name=${branch_name}" >> "${GITHUB_OUTPUT}"
+
+      - name: Validate branch name
+        uses: s5micheldevops/platform-reusable-workflows/actions/validate-branch-name@main
+        with:
+          branch_name: ${{ steps.branch.outputs.branch_name }}
+          allowed_regex: ${{ inputs.allowed_regex }}
