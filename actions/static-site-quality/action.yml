@@ -1,0 +1,110 @@
+name: "Static Site Quality"
+description: "Reusable composite action that runs basic quality checks for static websites."
+
+runs:
+  using: "composite"
+  steps:
+    - name: Run static site quality checks
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        echo "=================================================="
+        echo "Static Site Quality Checks"
+        echo "=================================================="
+        echo "This action runs lightweight checks for plain static websites."
+        echo ""
+
+        echo "--------------------------------------------------"
+        echo "1. Checking for index.html at repository root"
+        echo "--------------------------------------------------"
+        if [[ ! -f "index.html" ]]; then
+          echo "ERROR: index.html was not found at the repository root."
+          echo ""
+          echo "Beginner explanation:"
+          echo "A static website normally needs an index.html file at the root."
+          echo "This is the default page web servers look for when someone opens the site."
+          exit 1
+        fi
+        echo "OK: index.html exists."
+        echo ""
+
+        echo "--------------------------------------------------"
+        echo "2. Checking for Git conflict markers"
+        echo "--------------------------------------------------"
+        conflict_files="$(
+          git grep -Il -E '^(<<<<<<<|=======|>>>>>>>)' -- . ':!*.md' || true
+        )"
+        if [[ -n "${conflict_files}" ]]; then
+          echo "ERROR: Git conflict markers were found in tracked project files."
+          echo ""
+          echo "Files to review:"
+          echo "${conflict_files}"
+          echo ""
+          echo "Beginner explanation:"
+          echo "Conflict markers usually mean a merge conflict was not fully resolved."
+          echo "Open each file, choose the correct code, and remove the marker lines."
+          exit 1
+        fi
+        echo "OK: no Git conflict markers found in tracked project files."
+        echo ""
+
+        echo "--------------------------------------------------"
+        echo "3. Checking for obvious secret-like strings"
+        echo "--------------------------------------------------"
+        secret_files="$(
+          git grep -Il -i -E 'AWS_SECRET_ACCESS_KEY|PRIVATE KEY|api_key|access_token|password=' -- . || true
+        )"
+        if [[ -n "${secret_files}" ]]; then
+          echo "ERROR: Possible secret-like strings were found."
+          echo ""
+          echo "Files to review:"
+          echo "${secret_files}"
+          echo ""
+          echo "Beginner explanation:"
+          echo "Secrets are private values like passwords, API keys, tokens, private keys, and cloud credentials."
+          echo "This action intentionally prints only file paths, not the matching secret-like values."
+          echo "If a real secret was committed, rotate it before removing it from code."
+          exit 1
+        fi
+        echo "OK: no obvious secret-like strings found by this lightweight check."
+        echo ""
+
+        echo "--------------------------------------------------"
+        echo "4. Checking assets folder"
+        echo "--------------------------------------------------"
+        if [[ -d "assets" ]]; then
+          echo "OK: assets/ exists."
+          echo "Top-level assets summary:"
+          find assets -maxdepth 2 -mindepth 1 -print | sort | sed 's#^#- #'
+        else
+          echo "WARNING: assets/ was not found."
+          echo "This is not a failure. Some static sites keep images or CSS in other folders."
+        fi
+        echo ""
+
+        echo "--------------------------------------------------"
+        echo "5. Listing large files over 5 MB"
+        echo "--------------------------------------------------"
+        large_files="$(
+          find . \
+            -path './.git' -prune -o \
+            -type f -size +5M -printf '%p %s\n' | sort || true
+        )"
+        if [[ -n "${large_files}" ]]; then
+          echo "WARNING: files larger than 5 MB were found."
+          echo "Large files can slow down repository checkout and website loading."
+          echo ""
+          while read -r path size_bytes; do
+            [[ -z "${path}" ]] && continue
+            size_mb=$(( (size_bytes + 1048575) / 1048576 ))
+            echo "- ${path}: ${size_mb} MB"
+          done <<< "${large_files}"
+        else
+          echo "OK: no files over 5 MB found."
+        fi
+        echo ""
+
+        echo "=================================================="
+        echo "Static site quality checks completed."
+        echo "=================================================="
