@@ -1,0 +1,19 @@
+name: Security - Gitleaks
+
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  gitleaks:
+    name: Call reusable Gitleaks workflow
+    uses: s5micheldevops/platform-reusable-workflows/.github/workflows/reusable-gitleaks.yml@v0.1.0
+    with:
+      fetch_depth: 0
+      redact: true
+      fail_on_error: true
