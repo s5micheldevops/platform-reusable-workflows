@@ -1,172 +1,145 @@
 # Workflow Catalog
 
-This catalog will track reusable workflows as they are added.
+This catalog explains the reusable GitHub Actions workflows provided by `s5micheldevops/platform-reusable-workflows`.
 
-Phase 0 creates the catalog, but no reusable workflows are implemented yet.
+Production repositories should prefer version-pinned references such as `@v0.1.0`. The `@main` reference is useful while testing new workflow changes, but it tracks the latest code and can change at any time.
 
-Phase 1 adds a composite action for Gitleaks secret scanning.
+## Current Reusable Workflows
 
-Phase 2 adds a reusable Gitleaks workflow that application repositories can call.
-
-Phase 3 adds a composite action for branch naming validation.
-
-Phase 4 adds a reusable branch naming workflow that application repositories can call.
-
-## Planned Workflows
-
-| Workflow | Intended File | Purpose | Status |
+| Workflow | File | Purpose | Status |
 | --- | --- | --- | --- |
-| Static Site CI | `.github/workflows/static-site-ci.yml` | Validate simple HTML/CSS/JS websites. | Planned |
-| React App CI | `.github/workflows/react-app-ci.yml` | Install dependencies, lint, test, and build React or Node frontends. | Planned |
-| Docker Build | `.github/workflows/docker-build.yml` | Build and optionally publish Docker images. | Planned |
-| Terraform Plan | `.github/workflows/terraform-plan.yml` | Run formatting, validation, and plan checks. | Planned |
-| Kubernetes Validate | `.github/workflows/kubernetes-validate.yml` | Validate manifests and deployment configuration. | Planned |
-| Gitleaks Secret Scan | `.github/workflows/reusable-gitleaks.yml` | Run Gitleaks secret scanning through the platform composite action. | Added |
-| Branch Naming Validation | `.github/workflows/reusable-branch-naming.yml` | Enforce branch naming standards through the platform composite action. | Added |
+| Gitleaks Secret Scan | `.github/workflows/reusable-gitleaks.yml` | Scan repositories for leaked secrets. | Added |
+| Branch Naming Validation | `.github/workflows/reusable-branch-naming.yml` | Enforce branch naming standards. | Added |
+| Static Site Quality | `.github/workflows/reusable-static-site-quality.yml` | Run basic quality checks for plain static websites. | Added |
 
 ## Composite Actions
 
 | Action | Path | Purpose | Status |
 | --- | --- | --- | --- |
-| Platform Gitleaks Scan | `actions/gitleaks-scan/action.yml` | Run reusable secret scanning for checked-out GitHub repositories. | Added |
-| Validate Branch Name | `actions/validate-branch-name/action.yml` | Validate branch names against the platform naming standard or a custom regex. | Added |
+| Platform Gitleaks Scan | `actions/gitleaks-scan/action.yml` | Wraps `gitleaks/gitleaks-action@v2`. | Added |
+| Validate Branch Name | `actions/validate-branch-name/action.yml` | Validates branch names against default or custom regex rules. | Added |
+| Static Site Quality | `actions/static-site-quality/action.yml` | Checks `index.html`, conflict markers, secret-like strings, assets, and large files. | Added |
 
 ## Reusable Gitleaks Workflow
 
 ### Purpose
 
-`reusable-gitleaks.yml` provides a central GitHub Actions workflow for secret scanning. Application repositories call this workflow instead of copying Gitleaks setup into every repository.
+`.github/workflows/reusable-gitleaks.yml` runs secret scanning with Gitleaks. It helps catch API keys, tokens, private keys, passwords, and other sensitive values before they spread further.
 
 ### When To Use It
 
-Use this workflow for repositories that contain code, configuration, infrastructure files, or deployment manifests where secrets might accidentally be committed.
+Use this workflow on any repository that contains source code, website files, infrastructure files, deployment configuration, or client project files.
 
-Good candidates include:
-
-- Static websites.
-- React and Node applications.
-- Docker projects.
-- Terraform repositories.
-- Kubernetes configuration repositories.
-- Future client repositories.
-
-### How Application Repositories Call It
-
-Application repositories should create a small caller workflow, usually at:
+### Caller Workflow Filename Suggestion
 
 ```text
 .github/workflows/security-gitleaks.yml
 ```
 
-The caller workflow uses `jobs.<job_id>.uses` to call the reusable workflow:
+### Required Permissions
 
 ```yaml
+permissions:
+  contents: read
+```
+
+### Inputs
+
+| Input | Type | Default | Description |
+| --- | --- | --- | --- |
+| `fetch_depth` | number | `0` | Git fetch depth. Use `0` to scan full history. |
+| `fail_on_error` | boolean | `true` | Fails the job when Gitleaks detects secrets. |
+| `redact` | boolean | `true` | Redacts detected secrets from logs when supported. |
+
+### Production Example Using `@v0.1.0`
+
+```yaml
+name: Security - Gitleaks
+
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+
+permissions:
+  contents: read
+
 jobs:
   gitleaks:
-    uses: YOUR_GITHUB_USERNAME_OR_ORG/platform-reusable-workflows/.github/workflows/reusable-gitleaks.yml@main
+    name: Call reusable Gitleaks workflow
+    uses: s5micheldevops/platform-reusable-workflows/.github/workflows/reusable-gitleaks.yml@v0.1.0
     with:
       fetch_depth: 0
       fail_on_error: true
       redact: true
 ```
 
-A copy-ready example lives at:
-
-```text
-examples/static-site/security-gitleaks.yml
-```
-
-### Inputs
-
-| Input | Type | Default | Purpose |
-| --- | --- | --- | --- |
-| `fetch_depth` | number | `0` | Controls checkout history depth. Use `0` to scan full Git history. |
-| `fail_on_error` | boolean | `true` | Fails the job when Gitleaks detects secrets. |
-| `redact` | boolean | `true` | Redacts detected secret values from logs when supported. |
-
-### What Happens When Secrets Are Found
-
-When `fail_on_error` is `true`, a detected secret fails the job. A developer should inspect the finding, rotate any real exposed secret, remove the secret from code, and re-run the workflow.
-
-Do not only delete the secret from the latest commit. If it was committed, assume it may still exist in Git history or may already have been copied.
-
-### Why `fetch_depth: 0` Is Recommended
-
-Secret scanning is more useful when it checks full Git history. A shallow checkout may only scan recent files and miss secrets committed earlier.
-
-Use:
+### Development Example Using `@main`
 
 ```yaml
-fetch_depth: 0
+jobs:
+  gitleaks:
+    uses: s5micheldevops/platform-reusable-workflows/.github/workflows/reusable-gitleaks.yml@main
+    with:
+      fetch_depth: 0
+      fail_on_error: true
+      redact: true
 ```
 
-for serious repository validation.
+Use `@main` only for testing workflow changes before a new stable version tag is created.
 
-### Caller Workflow vs Reusable Workflow vs Composite Action
+### Troubleshooting
 
-| Layer | Where It Lives | What It Does |
-| --- | --- | --- |
-| Caller workflow | Application repository | Decides when to run and passes inputs. |
-| Reusable workflow | `platform-reusable-workflows/.github/workflows/reusable-gitleaks.yml` | Checks out the caller repository and calls `s5micheldevops/platform-reusable-workflows/actions/gitleaks-scan@main`. |
-| Composite action | `platform-reusable-workflows/actions/gitleaks-scan/action.yml` | Validates inputs and invokes `gitleaks/gitleaks-action@v2`. |
+| Problem | What To Check |
+| --- | --- |
+| Reusable workflow cannot be found | Confirm the repository path, workflow filename, and tag exist. Prefer `@v0.1.0` for stable usage. |
+| Gitleaks detected a secret | Rotate the secret, remove it from code, review history, and rerun the workflow. Do not paste secret values into tickets or logs. |
+| Scan misses older history | Confirm `fetch_depth: 0` is used. |
+
+### Beginner Explanation
+
+The application repository owns a small caller workflow. That caller workflow asks the central platform repository to run the reusable Gitleaks workflow. The reusable workflow checks out the application repository and calls the Gitleaks composite action.
 
 ## Reusable Branch Naming Workflow
 
 ### Purpose
 
-`reusable-branch-naming.yml` provides a central GitHub Actions workflow for branch naming governance. Application repositories call this workflow instead of copying shell scripts or regex rules into every repository.
+`.github/workflows/reusable-branch-naming.yml` validates that branch names follow a consistent naming standard.
 
 ### When To Use It
 
-Use this workflow for repositories where branch names should be consistent across teams and projects.
+Use this workflow on repositories where branch names should be readable and predictable for reviews, automation, release management, and audit trails.
 
-Good candidates include:
-
-- Static websites.
-- React and Node applications.
-- Docker projects.
-- Terraform repositories.
-- Kubernetes configuration repositories.
-- Future client repositories.
-
-### How Application Repositories Call It
-
-Application repositories should create a small caller workflow, usually at:
+### Caller Workflow Filename Suggestion
 
 ```text
 .github/workflows/enforce-branch-naming.yml
 ```
 
-The caller workflow uses `jobs.<job_id>.uses` to call the reusable workflow:
+### Required Permissions
 
 ```yaml
-jobs:
-  branch-naming:
-    uses: s5micheldevops/platform-reusable-workflows/.github/workflows/reusable-branch-naming.yml@main
-```
-
-A copy-ready example lives at:
-
-```text
-examples/static-site/enforce-branch-naming.yml
+permissions:
+  contents: read
 ```
 
 ### Inputs
 
-| Input | Type | Default | Purpose |
+| Input | Type | Default | Description |
 | --- | --- | --- | --- |
-| `allowed_regex` | string | `""` | Optional custom regex override for repositories that need different branch naming rules. |
+| `allowed_regex` | string | `""` | Optional custom regex override for allowed branch names. |
 
 ### Default Branch Rules
 
-The default composite action allows these exact branches:
+Allowed exact branches:
 
 - `main`
 - `master`
 - `develop`
 - `production`
 
-It also allows work branches that start with:
+Allowed prefixes:
 
 - `feature/`
 - `bug/`
@@ -178,7 +151,7 @@ It also allows work branches that start with:
 - `design/`
 - `release/`
 
-### Valid Examples
+Valid examples:
 
 - `feature/add-service-card`
 - `design/update-hero-layout`
@@ -186,7 +159,7 @@ It also allows work branches that start with:
 - `docs/update-maintenance-guide`
 - `hotfix/fix-contact-email`
 
-### Invalid Examples
+Invalid examples:
 
 - `test123`
 - `jean-work`
@@ -195,69 +168,164 @@ It also allows work branches that start with:
 - `feature/`
 - `feature/add login`
 
-### What Happens When A Branch Name Fails
+### Production Example Using `@v0.1.0`
 
-The reusable workflow fails the job. The composite action prints the detected branch name, the expected format, and valid examples. The developer should rename or recreate the branch using an accepted name.
+```yaml
+name: Governance - Branch Naming
 
-### How To Override `allowed_regex`
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
 
-Some repositories may need ticket IDs or a different naming rule. Those repositories can pass a custom regex:
+permissions:
+  contents: read
+
+jobs:
+  branch-naming:
+    name: Call reusable branch naming workflow
+    uses: s5micheldevops/platform-reusable-workflows/.github/workflows/reusable-branch-naming.yml@v0.1.0
+```
+
+### Development Example Using `@main`
 
 ```yaml
 jobs:
   branch-naming:
     uses: s5micheldevops/platform-reusable-workflows/.github/workflows/reusable-branch-naming.yml@main
+```
+
+### Override Example
+
+```yaml
+jobs:
+  branch-naming:
+    uses: s5micheldevops/platform-reusable-workflows/.github/workflows/reusable-branch-naming.yml@v0.1.0
     with:
       allowed_regex: '^(main|develop|feature/[A-Z]+-[0-9]+-[a-z0-9._-]+)$'
 ```
 
-Use overrides carefully because they become part of that repository's governance contract.
+### Troubleshooting
 
-### Why Branch Naming Matters For CI/CD Governance
-
-CI/CD systems often make decisions based on branch names. A consistent branch strategy can support deployment gates, release automation, hotfix handling, audit trails, and reviewer expectations.
-
-### Caller Workflow vs Reusable Workflow Vs Composite Action
-
-| Layer | Where It Lives | What It Does |
-| --- | --- | --- |
-| Caller workflow | Application repository | Decides when to run branch validation. |
-| Reusable workflow | `platform-reusable-workflows/.github/workflows/reusable-branch-naming.yml` | Detects the branch from GitHub context and calls the branch validation action. |
-| Composite action | `platform-reusable-workflows/actions/validate-branch-name/action.yml` | Applies the default or custom regex and prints pass/fail guidance. |
-
-## Workflow Selection Guide
-
-| Project Type | Recommended Future Workflow |
+| Problem | What To Check |
 | --- | --- |
-| Plain HTML/CSS/JS website | Static Site CI |
-| React frontend | React App CI |
-| Node service | React App CI or a future Node service CI workflow |
-| Containerized app | Docker Build |
-| Infrastructure as Code | Terraform Plan |
-| Kubernetes manifests | Kubernetes Validate |
+| Branch naming workflow failed | Rename the branch using an allowed prefix and readable description. |
+| Pull request branch looks different from push branch | The workflow uses `github.head_ref` for pull requests and `github.ref_name` for pushes. |
+| Custom regex rejects valid branches | Test the regex carefully and keep it documented in the application repository. |
 
-## Required Documentation For Every Workflow
+### Beginner Explanation
 
-Each future workflow should document:
+A branch name is more than a label. CI/CD systems can use it to decide which checks to run, whether a deployment should be allowed, and how release work should be treated.
 
-- Workflow purpose.
-- Inputs.
-- Secrets.
-- Permissions.
-- Outputs, if any.
-- Example consumer usage.
-- Supported project types.
-- Known limitations.
+## Reusable Static Site Quality Workflow
 
-## Naming Guidelines
+### Purpose
 
-Use generic names that describe the capability, not a client or project.
+`.github/workflows/reusable-static-site-quality.yml` runs lightweight checks for plain static websites without Docker or npm.
 
-Good examples:
+### When To Use It
 
-- `static-site-ci.yml`
-- `react-app-ci.yml`
-- `docker-build.yml`
-- `terraform-plan.yml`
+Use this workflow for repositories that publish simple HTML/CSS/JavaScript websites.
 
-Avoid names tied to one website, one client, or one temporary use case.
+### Caller Workflow Filename Suggestion
+
+```text
+.github/workflows/frontend-quality.yml
+```
+
+### Required Permissions
+
+```yaml
+permissions:
+  contents: read
+```
+
+### Inputs
+
+This workflow currently has no inputs.
+
+### Checks Performed
+
+- Confirms `index.html` exists at the repository root.
+- Detects Git conflict markers.
+- Detects obvious secret-like strings without printing values.
+- Warns if `assets/` is missing.
+- Lists files larger than 5 MB as warnings.
+
+### Production Example Using `@v0.1.0`
+
+```yaml
+name: Quality - Static Site
+
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  static-site-quality:
+    name: Call reusable static site quality workflow
+    uses: s5micheldevops/platform-reusable-workflows/.github/workflows/reusable-static-site-quality.yml@v0.1.0
+```
+
+### Development Example Using `@main`
+
+```yaml
+jobs:
+  static-site-quality:
+    uses: s5micheldevops/platform-reusable-workflows/.github/workflows/reusable-static-site-quality.yml@main
+```
+
+### Troubleshooting
+
+| Problem | What To Check |
+| --- | --- |
+| `index.html` is missing | Put the website entry file at the repository root or use a future workflow version that supports custom paths. |
+| Conflict markers detected | Resolve the merge conflict and remove `<<<<<<<`, `=======`, and `>>>>>>>` marker lines. |
+| Large files warning appears | Review large images, videos, archives, or generated files. This warning does not fail the job yet. |
+| `assets/` warning appears | This is not a failure. Some sites use different folders. |
+
+### Beginner Explanation
+
+This workflow is a basic quality gate for static sites. It catches common mistakes before they reach production, while staying simple enough for plain HTML/CSS/JS repositories.
+
+## Caller Workflow vs Reusable Workflow vs Composite Action
+
+| Layer | Where It Lives | How It Is Used |
+| --- | --- | --- |
+| Caller workflow | Application repository | Defines triggers and calls a reusable workflow with `jobs.<job_id>.uses`. |
+| Reusable workflow | `s5micheldevops/platform-reusable-workflows/.github/workflows/` | Defines shared jobs for many repositories. |
+| Composite action | `s5micheldevops/platform-reusable-workflows/actions/` | Reusable steps called from reusable workflows. |
+
+Reusable workflows are called at the job level:
+
+```yaml
+jobs:
+  quality:
+    uses: s5micheldevops/platform-reusable-workflows/.github/workflows/reusable-static-site-quality.yml@v0.1.0
+```
+
+They are not called inside `steps`.
+
+## Planned Future Workflows
+
+| Workflow | Intended File | Purpose | Status |
+| --- | --- | --- | --- |
+| React App CI | `.github/workflows/react-app-ci.yml` | Install dependencies, lint, test, and build React or Node frontends. | Planned |
+| Docker Build | `.github/workflows/docker-build.yml` | Build and optionally publish Docker images. | Planned |
+| Terraform Plan | `.github/workflows/terraform-plan.yml` | Run formatting, validation, and plan checks. | Planned |
+| Kubernetes Validate | `.github/workflows/kubernetes-validate.yml` | Validate manifests and deployment configuration. | Planned |
+
+## General Troubleshooting
+
+| Problem | Likely Cause | Fix |
+| --- | --- | --- |
+| Workflow does not appear in GitHub Actions | The caller workflow file is missing, not committed, or not pushed. | Place it under `.github/workflows/`, commit, and push it. |
+| Reusable workflow cannot be found | Wrong repository path, file path, or tag. | Use `s5micheldevops/platform-reusable-workflows/.github/workflows/<file>@v0.1.0`. |
+| Node.js 20 deprecation warning from `actions/checkout@v4` | GitHub is warning about runtime lifecycle. | This is not currently a workflow failure. Update action versions in a future platform release when needed. |
+
