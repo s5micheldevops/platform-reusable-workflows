@@ -1,0 +1,22 @@
+name: Quality - Static Site
+
+# Copy this file into a static website repository at:
+# .github/workflows/frontend-quality.yml
+#
+# This caller workflow lives in the application repository.
+# The reusable workflow lives in platform-reusable-workflows.
+# Reusable workflows must be called with jobs.<job_id>.uses, not as a normal step.
+
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  static-site-quality:
+    name: Call reusable static site quality workflow
+    uses: s5micheldevops/platform-reusable-workflows/.github/workflows/reusable-static-site-quality.yml@main

@@ -1,0 +1,19 @@
+name: Reusable - Static Site Quality
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  static-site-quality:
+    name: Static Site Quality
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source repository
+        uses: actions/checkout@v4
+
+      - name: Run platform static site quality checks
+        uses: s5micheldevops/platform-reusable-workflows/actions/static-site-quality@main
