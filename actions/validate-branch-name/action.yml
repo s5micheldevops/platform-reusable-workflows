@@ -24,7 +24,7 @@ runs:
         # Default standard:
         # - allows stable environment branches such as main and develop
         # - allows readable work branches such as feature/add-login-page
-        default_regex='^(main|master|develop|production|((feature|bug|hotfix|chore|docs|ci|refactor|design|release)\/[a-z0-9][a-z0-9._-]*))$'
+        default_regex='^(main|master|develop|staging|production|((feature|bug|bugfix|hotfix|chore|docs|ci|refactor|design|release)\/[a-z0-9][a-z0-9._-]*))$'
         allowed_regex="${custom_regex:-$default_regex}"
 
         echo "Validating branch name: ${branch_name}"
@@ -38,12 +38,13 @@ runs:
         echo "Branch name is invalid: ${branch_name}"
         echo ""
         echo "Expected format:"
-        echo "- Exact protected or long-lived branches: main, master, develop, production"
+        echo "- Exact protected or long-lived branches: main, master, develop, staging, production"
         echo "- Work branches: <type>/<short-readable-description>"
         echo ""
         echo "Allowed work branch types:"
         echo "- feature/"
         echo "- bug/"
+        echo "- bugfix/"
         echo "- hotfix/"
         echo "- chore/"
         echo "- docs/"
