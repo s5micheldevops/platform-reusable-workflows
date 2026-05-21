@@ -197,8 +197,10 @@ jobs:
                 waitUntil: 'domcontentloaded',
                 timeout: navigationTimeout,
               });
-              await expectVisible(page.locator('text=/\\bFR\\b/'), 'FR language toggle was not found.');
-              await expectVisible(page.locator('text=/\\bEN\\b/'), 'EN language toggle was not found.');
+              const visibleFr = page.locator('button.lang-btn:visible', { hasText: 'FR' });
+              const visibleEn = page.locator('button.lang-btn:visible', { hasText: 'EN' });
+              await visibleFr.first().waitFor({ state: 'visible', timeout: selectorTimeout });
+              await visibleEn.first().waitFor({ state: 'visible', timeout: selectorTimeout });
             }
 
             if (runtimeErrors.length > 0) {
