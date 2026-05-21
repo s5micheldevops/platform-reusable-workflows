@@ -11,6 +11,7 @@ Production repositories should prefer version-pinned references such as `@v0.1.0
 | Gitleaks Secret Scan | `.github/workflows/reusable-gitleaks.yml` | Scan repositories for leaked secrets. | Added |
 | Branch Naming Validation | `.github/workflows/reusable-branch-naming.yml` | Enforce branch naming standards. | Added |
 | Static Site Quality | `.github/workflows/reusable-static-site-quality.yml` | Run basic quality checks for plain static websites. | Added |
+| Playwright Smoke Test | `.github/workflows/reusable-playwright-smoke.yml` | Run lightweight browser smoke checks against a deployed website. | Added |
 
 ## Composite Actions
 
@@ -294,6 +295,138 @@ jobs:
 
 This workflow is a basic quality gate for static sites. It catches common mistakes before they reach production, while staying simple enough for plain HTML/CSS/JS repositories.
 
+## Reusable Playwright Smoke Test Workflow
+
+### Purpose
+
+`.github/workflows/reusable-playwright-smoke.yml` runs lightweight Playwright checks against a deployed website URL. It opens the site in Chromium, confirms the page loads, verifies that core content renders, and checks important website paths such as Services, Contact, and Privacy when enabled.
+
+### Static Quality Checks vs Browser Smoke Testing
+
+Static site quality checks inspect repository files before deployment. They are fast and useful for catching missing `index.html`, conflict markers, secret-like strings, and oversized files.
+
+Browser smoke testing checks a real deployed page after deployment. It catches problems that file checks cannot see, such as a broken staging URL, JavaScript runtime failures, a browser crash, missing deployed assets, or a missing section after deployment.
+
+### When To Use It
+
+Use this workflow after a staging deployment has completed and the staging URL is reachable. It is recommended for static websites, landing pages, and small frontend sites where a quick browser confidence check is useful before production promotion.
+
+### Caller Workflow Filename Suggestion
+
+```text
+.github/workflows/playwright-smoke.yml
+```
+
+### Required Permissions
+
+```yaml
+permissions:
+  contents: read
+```
+
+### Inputs
+
+| Input | Type | Default | Description |
+| --- | --- | --- | --- |
+| `target_url` | string | Required | Fully qualified URL to test, such as `https://staging.example.com`. |
+| `check_privacy_page` | boolean | `true` | Checks that a privacy link exists and that the linked page loads. |
+| `check_contact_section` | boolean | `true` | Checks that a contact section or contact link exists. |
+| `check_language_toggle` | boolean | `false` | Checks that visible `FR` and `EN` language controls exist. |
+
+### Checks Performed
+
+- Opens `target_url` in Chromium.
+- Fails if the page is unreachable or returns a failed HTTP status.
+- Confirms the page has a non-empty title.
+- Confirms the body renders visible text.
+- Confirms a Services section or Services navigation link exists.
+- Optionally confirms Privacy, Contact, and FR/EN language toggle elements.
+- Fails on JavaScript runtime errors or failed navigation requests detected by Playwright.
+
+### Recommended Staging Usage
+
+Run this workflow after the staging deployment job, not before it. The caller workflow should pass the deployed staging URL through `target_url`.
+
+```yaml
+jobs:
+  deploy-staging:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Deploy staging site here"
+
+  playwright-smoke:
+    needs: deploy-staging
+    uses: s5micheldevops/platform-reusable-workflows/.github/workflows/reusable-playwright-smoke.yml@v0.1.0
+    with:
+      target_url: https://staging.example.com
+      check_privacy_page: true
+      check_contact_section: true
+      check_language_toggle: false
+```
+
+### Production Example Using `@v0.1.0`
+
+```yaml
+name: Smoke - Playwright
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  playwright-smoke:
+    name: Call reusable Playwright smoke workflow
+    uses: s5micheldevops/platform-reusable-workflows/.github/workflows/reusable-playwright-smoke.yml@v0.1.0
+    with:
+      target_url: https://staging.example.com
+      check_privacy_page: true
+      check_contact_section: true
+      check_language_toggle: false
+```
+
+### Development Example Using `@main`
+
+```yaml
+jobs:
+  playwright-smoke:
+    uses: s5micheldevops/platform-reusable-workflows/.github/workflows/reusable-playwright-smoke.yml@main
+    with:
+      target_url: https://staging.example.com
+```
+
+Use `@main` only for testing workflow changes before a new stable version tag is created.
+
+### Expected Runtime Cost
+
+This workflow installs Playwright and a Chromium browser on `ubuntu-latest`, then runs a small smoke script. It is heavier than static quality checks but still lightweight for staging validation. Expected runtime is usually a few minutes, depending on GitHub runner speed and browser dependency installation time.
+
+### Current Limits
+
+- No Docker.
+- No screenshots or artifacts.
+- No visual regression testing.
+- No Percy, Chromatic, or external SaaS dependency.
+- No full end-to-end user journey coverage.
+
+### Troubleshooting
+
+| Problem | What To Check |
+| --- | --- |
+| Page unreachable | Confirm the staging deployment completed and `target_url` is publicly reachable from GitHub-hosted runners. |
+| Services check failed | Confirm the page has a visible Services section, Services link, or element with an ID containing `services`. |
+| Privacy check failed | Confirm the page has a visible privacy link and that the linked page returns a successful HTTP status. |
+| Contact check failed | Confirm the page has a visible Contact section, Contact link, or element with an ID containing `contact`. |
+| Language toggle check failed | Enable `check_language_toggle` only for sites that visibly show `FR` and `EN` controls. |
+| Runtime error detected | Review browser console errors locally and check whether deployed JavaScript assets are loading correctly. |
+
+### Beginner Explanation
+
+Static checks answer: "Do the files look reasonable before deployment?"
+
+Playwright smoke checks answer: "Can a real browser open the deployed staging site and see the most important pieces?"
+
 ## Caller Workflow vs Reusable Workflow vs Composite Action
 
 | Layer | Where It Lives | How It Is Used |
@@ -328,4 +461,3 @@ They are not called inside `steps`.
 | Workflow does not appear in GitHub Actions | The caller workflow file is missing, not committed, or not pushed. | Place it under `.github/workflows/`, commit, and push it. |
 | Reusable workflow cannot be found | Wrong repository path, file path, or tag. | Use `s5micheldevops/platform-reusable-workflows/.github/workflows/<file>@v0.1.0`. |
 | Node.js 20 deprecation warning from `actions/checkout@v4` | GitHub is warning about runtime lifecycle. | This is not currently a workflow failure. Update action versions in a future platform release when needed. |
-

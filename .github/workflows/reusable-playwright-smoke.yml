@@ -1,0 +1,216 @@
+name: Reusable - Playwright Smoke Test
+
+on:
+  workflow_call:
+    inputs:
+      target_url:
+        type: string
+        required: true
+        description: "Fully qualified URL to test, such as https://staging.example.com."
+      check_privacy_page:
+        type: boolean
+        required: false
+        default: true
+        description: "Check that a privacy link exists and the linked page loads."
+      check_contact_section:
+        type: boolean
+        required: false
+        default: true
+        description: "Check that a contact section or contact link exists."
+      check_language_toggle:
+        type: boolean
+        required: false
+        default: false
+        description: "Check that visible FR and EN language toggle controls exist."
+
+permissions:
+  contents: read
+
+jobs:
+  playwright-smoke:
+    name: Playwright Smoke Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout caller repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Playwright
+        timeout-minutes: 6
+        run: |
+          npm init -y
+          npm install --save-dev playwright
+          npx playwright install --with-deps chromium
+
+      - name: Run browser smoke checks
+        timeout-minutes: 4
+        env:
+          TARGET_URL: ${{ inputs.target_url }}
+          CHECK_PRIVACY_PAGE: ${{ inputs.check_privacy_page }}
+          CHECK_CONTACT_SECTION: ${{ inputs.check_contact_section }}
+          CHECK_LANGUAGE_TOGGLE: ${{ inputs.check_language_toggle }}
+        run: |
+          cat > playwright-smoke.js <<'EOF'
+          const { chromium } = require('playwright');
+
+          const targetUrl = process.env.TARGET_URL;
+          const checkPrivacyPage = process.env.CHECK_PRIVACY_PAGE === 'true';
+          const checkContactSection = process.env.CHECK_CONTACT_SECTION === 'true';
+          const checkLanguageToggle = process.env.CHECK_LANGUAGE_TOGGLE === 'true';
+
+          const navigationTimeout = 15000;
+          const selectorTimeout = 5000;
+
+          function fail(message) {
+            throw new Error(message);
+          }
+
+          async function expectVisible(locator, message) {
+            const count = await locator.count();
+            if (count === 0) {
+              fail(message);
+            }
+            await locator.first().waitFor({ state: 'visible', timeout: selectorTimeout });
+            return locator.first();
+          }
+
+          async function expectAnyVisible(page, selectors, message) {
+            for (const selector of selectors) {
+              const locator = page.locator(selector);
+              if ((await locator.count()) === 0) {
+                continue;
+              }
+
+              try {
+                await locator.first().waitFor({ state: 'visible', timeout: selectorTimeout });
+                return locator.first();
+              } catch {
+                // Try the next selector before failing the smoke check.
+              }
+            }
+
+            fail(message);
+          }
+
+          (async () => {
+            if (!targetUrl || !/^https?:\/\//.test(targetUrl)) {
+              fail('target_url must be a fully qualified http or https URL.');
+            }
+
+            const browser = await chromium.launch();
+            const page = await browser.newPage();
+            const runtimeErrors = [];
+
+            page.on('pageerror', (error) => {
+              runtimeErrors.push(error.message);
+            });
+
+            page.on('requestfailed', (request) => {
+              if (request.isNavigationRequest()) {
+                runtimeErrors.push(`Navigation request failed: ${request.url()} ${request.failure()?.errorText || ''}`.trim());
+              }
+            });
+
+            const response = await page.goto(targetUrl, {
+              waitUntil: 'domcontentloaded',
+              timeout: navigationTimeout,
+            });
+
+            if (!response) {
+              fail('No response received from target_url.');
+            }
+
+            if (!response.ok()) {
+              fail(`Target URL returned HTTP ${response.status()}.`);
+            }
+
+            await page.locator('body').waitFor({ state: 'visible', timeout: selectorTimeout });
+
+            const title = (await page.title()).trim();
+            if (!title) {
+              fail('Page title is missing.');
+            }
+
+            const bodyText = (await page.locator('body').innerText({ timeout: selectorTimeout })).trim();
+            if (!bodyText) {
+              fail('Body rendered without visible text.');
+            }
+
+            await expectAnyVisible(
+              page,
+              [
+                '#services',
+                '[id*="services" i]',
+                'a[href*="#services" i]',
+                'section:has-text("Services")',
+                'main:has-text("Services")',
+              ],
+              'Services section or navigation link was not found.'
+            );
+
+            if (checkPrivacyPage) {
+              const privacyLink = await expectVisible(
+                page.locator('a[href*="privacy" i], a').filter({ hasText: /privacy policy|politique de confidentialité/i }),
+                'Privacy link was not found.'
+              );
+
+              const href = await privacyLink.getAttribute('href');
+              if (href) {
+                const privacyUrl = new URL(href, targetUrl).toString();
+                const privacyResponse = await page.goto(privacyUrl, {
+                  waitUntil: 'domcontentloaded',
+                  timeout: navigationTimeout,
+                });
+                if (!privacyResponse || !privacyResponse.ok()) {
+                  fail(`Privacy page did not load successfully: ${privacyUrl}`);
+                }
+                await page.locator('body').waitFor({ state: 'visible', timeout: selectorTimeout });
+              }
+            }
+
+            if (checkContactSection) {
+              await page.goto(targetUrl, {
+                waitUntil: 'domcontentloaded',
+                timeout: navigationTimeout,
+              });
+              await expectAnyVisible(
+                page,
+                [
+                  '#contact',
+                  '[id*="contact" i]',
+                  'a[href*="#contact" i]',
+                  'section:has-text("Contact")',
+                  'main:has-text("Contact")',
+                ],
+                'Contact section or contact link was not found.'
+              );
+            }
+
+            if (checkLanguageToggle) {
+              await page.goto(targetUrl, {
+                waitUntil: 'domcontentloaded',
+                timeout: navigationTimeout,
+              });
+              await expectVisible(page.locator('text=/\\bFR\\b/'), 'FR language toggle was not found.');
+              await expectVisible(page.locator('text=/\\bEN\\b/'), 'EN language toggle was not found.');
+            }
+
+            if (runtimeErrors.length > 0) {
+              fail(`JavaScript runtime or navigation error detected: ${runtimeErrors.join(' | ')}`);
+            }
+
+            await browser.close();
+            console.log(`Playwright smoke checks passed for ${targetUrl}`);
+          })().catch(async (error) => {
+            console.error(error.message);
+            process.exit(1);
+          });
+          EOF
+
+          node playwright-smoke.js
