@@ -1,0 +1,88 @@
+name: Reusable - React Doctor
+
+on:
+  workflow_call:
+    inputs:
+      node-version:
+        type: string
+        required: false
+        default: "20"
+        description: "Node.js version to use."
+      working-directory:
+        type: string
+        required: false
+        default: "."
+        description: "Directory containing the React, Next.js, or Vite project."
+      fail-on-issues:
+        type: boolean
+        required: false
+        default: false
+        description: "Fail the workflow when React Doctor reports issues."
+
+permissions:
+  contents: read
+
+jobs:
+  react-doctor:
+    name: React Doctor
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout caller repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+
+      - name: Enable Corepack
+        working-directory: ${{ inputs.working-directory }}
+        run: corepack enable
+
+      - name: Install dependencies
+        working-directory: ${{ inputs.working-directory }}
+        run: |
+          if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; then
+            npm ci
+          elif [ -f pnpm-lock.yaml ]; then
+            pnpm install --frozen-lockfile
+          elif [ -f yarn.lock ]; then
+            yarn install --immutable || yarn install --frozen-lockfile
+          else
+            npm install
+          fi
+
+      - name: Run React Doctor
+        working-directory: ${{ inputs.working-directory }}
+        env:
+          FAIL_ON_ISSUES: ${{ inputs.fail-on-issues }}
+        run: |
+          set +e
+          npx react-doctor@latest --no-telemetry 2>&1 | tee react-doctor-results.log
+          react_doctor_status=${PIPESTATUS[0]}
+          set -e
+
+          echo "React Doctor exit code: ${react_doctor_status}"
+
+          if [ "${react_doctor_status}" -ne 0 ] && [ "${FAIL_ON_ISSUES}" = "true" ]; then
+            echo "React Doctor reported issues and fail-on-issues is true."
+            exit "${react_doctor_status}"
+          fi
+
+          if [ "${react_doctor_status}" -ne 0 ]; then
+            echo "React Doctor reported issues, but fail-on-issues is false. Continuing in report-only mode."
+          else
+            echo "React Doctor completed without reported issues."
+          fi
+
+      - name: Publish React Doctor results in logs
+        if: always()
+        working-directory: ${{ inputs.working-directory }}
+        run: |
+          if [ -f react-doctor-results.log ]; then
+            cat react-doctor-results.log
+          else
+            echo "No React Doctor results log was created."
+          fi
