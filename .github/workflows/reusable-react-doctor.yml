@@ -18,6 +18,11 @@ on:
         required: false
         default: false
         description: "Fail the workflow when React Doctor reports issues."
+      show-score:
+        type: boolean
+        required: false
+        default: true
+        description: "Show React Doctor score when supported."
 
 permissions:
   contents: read
@@ -58,9 +63,18 @@ jobs:
         working-directory: ${{ inputs.working-directory }}
         env:
           FAIL_ON_ISSUES: ${{ inputs.fail-on-issues }}
+          SHOW_SCORE: ${{ inputs.show-score }}
         run: |
+          react_doctor_args=(--no-telemetry)
+
+          if [ "${SHOW_SCORE}" = "true" ]; then
+            react_doctor_args+=(--score)
+          else
+            react_doctor_args+=(--no-score)
+          fi
+
           set +e
-          npx react-doctor@latest --no-telemetry 2>&1 | tee react-doctor-results.log
+          npx react-doctor@latest "${react_doctor_args[@]}" 2>&1 | tee react-doctor-results.log
           react_doctor_status=${PIPESTATUS[0]}
           set -e
 
