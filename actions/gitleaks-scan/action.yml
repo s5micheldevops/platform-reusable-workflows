@@ -14,6 +14,9 @@ inputs:
     description: "Redact secrets from logs."
     required: false
     default: "true"
+  github_token:
+    description: "Token forwarded to gitleaks-action; required by gitleaks/gitleaks-action@v2 for pull_request-triggered scans."
+    required: true
 
 runs:
   using: "composite"
@@ -56,3 +59,4 @@ runs:
       env:
         # Redaction keeps detected secret values out of logs when supported by the Gitleaks action.
         GITLEAKS_REDACT: ${{ inputs.redact }}
+        GITHUB_TOKEN: ${{ inputs.github_token }}
