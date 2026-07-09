@@ -36,8 +36,7 @@ jobs:
           fetch-depth: ${{ inputs.fetch_depth }}
 
       - name: Run platform Gitleaks composite action
-        # TEMPORARY smoke-test pin — revert to @main before merging this PR.
-        uses: s5micheldevops/platform-reusable-workflows/actions/gitleaks-scan@feature/gitleaks-token-forwarding
+        uses: s5micheldevops/platform-reusable-workflows/actions/gitleaks-scan@main
         with:
           fetch_depth: ${{ inputs.fetch_depth }}
           fail_on_error: ${{ inputs.fail_on_error }}
