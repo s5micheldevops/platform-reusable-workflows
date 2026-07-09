@@ -21,6 +21,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: read
 
 jobs:
   gitleaks-secret-scan:
@@ -40,3 +41,4 @@ jobs:
           fetch_depth: ${{ inputs.fetch_depth }}
           fail_on_error: ${{ inputs.fail_on_error }}
           redact: ${{ inputs.redact }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
