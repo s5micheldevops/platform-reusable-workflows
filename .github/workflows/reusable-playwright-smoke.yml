@@ -7,6 +7,11 @@ on:
         type: string
         required: true
         description: "Fully qualified URL to test, such as https://staging.example.com."
+      check_services_section:
+        type: boolean
+        required: false
+        default: true
+        description: "Check that a Services section or navigation link exists."
       check_privacy_page:
         type: boolean
         required: false
@@ -52,6 +57,7 @@ jobs:
         timeout-minutes: 4
         env:
           TARGET_URL: ${{ inputs.target_url }}
+          CHECK_SERVICES_SECTION: ${{ inputs.check_services_section }}
           CHECK_PRIVACY_PAGE: ${{ inputs.check_privacy_page }}
           CHECK_CONTACT_SECTION: ${{ inputs.check_contact_section }}
           CHECK_LANGUAGE_TOGGLE: ${{ inputs.check_language_toggle }}
@@ -60,6 +66,7 @@ jobs:
           const { chromium } = require('playwright');
 
           const targetUrl = process.env.TARGET_URL;
+          const checkServicesSection = process.env.CHECK_SERVICES_SECTION === 'true';
           const checkPrivacyPage = process.env.CHECK_PRIVACY_PAGE === 'true';
           const checkContactSection = process.env.CHECK_CONTACT_SECTION === 'true';
           const checkLanguageToggle = process.env.CHECK_LANGUAGE_TOGGLE === 'true';
@@ -142,17 +149,19 @@ jobs:
               fail('Body rendered without visible text.');
             }
 
-            await expectAnyVisible(
-              page,
-              [
-                '#services',
-                '[id*="services" i]',
-                'a[href*="#services" i]',
-                'section:has-text("Services")',
-                'main:has-text("Services")',
-              ],
-              'Services section or navigation link was not found.'
-            );
+            if (checkServicesSection) {
+              await expectAnyVisible(
+                page,
+                [
+                  '#services',
+                  '[id*="services" i]',
+                  'a[href*="#services" i]',
+                  'section:has-text("Services")',
+                  'main:has-text("Services")',
+                ],
+                'Services section or navigation link was not found.'
+              );
+            }
 
             if (checkPrivacyPage) {
               const privacyLink = await expectVisible(
