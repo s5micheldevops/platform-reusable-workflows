@@ -62,7 +62,7 @@ jobs:
           CHECK_CONTACT_SECTION: ${{ inputs.check_contact_section }}
           CHECK_LANGUAGE_TOGGLE: ${{ inputs.check_language_toggle }}
         run: |
-          cat > playwright-smoke.js <<'EOF'
+          cat > playwright-smoke.cjs <<'EOF'
           const { chromium } = require('playwright');
 
           const targetUrl = process.env.TARGET_URL;
@@ -224,4 +224,4 @@ jobs:
           });
           EOF
 
-          node playwright-smoke.js
+          node playwright-smoke.cjs
