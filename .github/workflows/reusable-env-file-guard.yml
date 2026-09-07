@@ -1,0 +1,25 @@
+name: Reusable - Environment File Guard
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  environment-file-guard:
+    name: Environment File Guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout caller repository
+        uses: actions/checkout@v4
+      - name: Checkout matching platform workflow revision
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .platform-reusable-workflows
+          persist-credentials: false
+      - name: Inspect tracked environment filenames
+        run: node .platform-reusable-workflows/scripts/security/environment-guard.mjs .

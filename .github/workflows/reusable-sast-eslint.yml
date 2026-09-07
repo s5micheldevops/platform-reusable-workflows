@@ -1,0 +1,60 @@
+name: Reusable - JavaScript and TypeScript SAST
+
+# Compatibility note: the filename retains the historical "eslint" name used
+# by existing callers. SAST engine v1 is Semgrep Community Edition, not ESLint.
+on:
+  workflow_call:
+    inputs:
+      working_directory:
+        type: string
+        required: false
+        default: "."
+        description: "Directory containing JavaScript, TypeScript, or React source to scan."
+
+permissions:
+  contents: read
+
+jobs:
+  sast:
+    name: Semgrep CE SAST
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout caller repository
+        uses: actions/checkout@v4
+      - name: Checkout matching platform workflow revision
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .platform-reusable-workflows
+          persist-credentials: false
+      - name: Validate working directory
+        env:
+          WORKING_DIRECTORY: ${{ inputs.working_directory }}
+        run: |
+          case "${WORKING_DIRECTORY}" in
+            -*)
+              echo "SAST configuration error: working_directory must not begin with '-': ${WORKING_DIRECTORY}"
+              exit 2
+              ;;
+          esac
+
+          if [ ! -d "${WORKING_DIRECTORY}" ]; then
+            echo "SAST configuration error: working_directory does not exist or is not a directory: ${WORKING_DIRECTORY}"
+            exit 2
+          fi
+      - name: Install exact Semgrep CE version
+        run: python -m pip install --disable-pip-version-check --no-input "semgrep==1.176.1"
+      - name: Run blocking JavaScript and TypeScript security scan
+        env:
+          WORKING_DIRECTORY: ${{ inputs.working_directory }}
+        run: |
+          semgrep scan \
+            --config .platform-reusable-workflows/security/semgrep/javascript-typescript-security-v1.yml \
+            --error \
+            --severity ERROR \
+            --exclude .platform-reusable-workflows \
+            --exclude tests/security-workflows/fixtures \
+            -- \
+            "${WORKING_DIRECTORY}"

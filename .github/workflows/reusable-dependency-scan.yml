@@ -1,0 +1,51 @@
+name: Reusable - npm Dependency Scan
+
+on:
+  workflow_call:
+    inputs:
+      fail_on_severity:
+        type: string
+        required: false
+        default: "high"
+        description: "Minimum vulnerability severity that fails the scan: low, moderate, high, or critical."
+      node_version:
+        type: string
+        required: false
+        default: "20"
+        description: "Node.js version used to run npm audit."
+      working_directory:
+        type: string
+        required: false
+        default: "."
+        description: "Directory containing package.json and an npm lockfile."
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-scan:
+    name: npm Dependency Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout caller repository
+        uses: actions/checkout@v4
+      - name: Checkout matching platform workflow revision
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .platform-reusable-workflows
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node_version }}
+      - name: Audit npm lockfile
+        env:
+          FAIL_ON_SEVERITY: ${{ inputs.fail_on_severity }}
+          WORKING_DIRECTORY: ${{ inputs.working_directory }}
+        run: |
+          node .platform-reusable-workflows/scripts/security/dependency-scan.mjs \
+            "${FAIL_ON_SEVERITY}" \
+            "${WORKING_DIRECTORY}"
