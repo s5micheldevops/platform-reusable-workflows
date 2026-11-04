@@ -1,0 +1,30 @@
+name: "Platform npm Dependency Scan"
+description: "Runs npm audit against the caller repository and fails on a configurable severity threshold."
+
+inputs:
+  fail_on_severity:
+    description: "Minimum vulnerability severity that fails the scan: low, moderate, high, or critical."
+    required: false
+    default: "high"
+  working_directory:
+    description: "Directory containing package.json and an npm lockfile."
+    required: false
+    default: "."
+
+runs:
+  using: "composite"
+  steps:
+    - name: Audit npm lockfile
+      shell: bash
+      env:
+        FAIL_ON_SEVERITY: ${{ inputs.fail_on_severity }}
+        WORKING_DIRECTORY: ${{ inputs.working_directory }}
+      run: |
+        set -euo pipefail
+
+        # GITHUB_ACTION_PATH points at this action's directory inside the
+        # platform repository that GitHub checks out at the referenced ref.
+        # The scanner script therefore always matches the action version.
+        node "${GITHUB_ACTION_PATH}/../../scripts/security/dependency-scan.mjs" \
+          "${FAIL_ON_SEVERITY}" \
+          "${WORKING_DIRECTORY}"
