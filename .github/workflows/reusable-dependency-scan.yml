@@ -30,22 +30,16 @@ jobs:
     steps:
       - name: Checkout caller repository
         uses: actions/checkout@v4
-      - name: Checkout matching platform workflow revision
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ job.workflow_repository }}
-          ref: ${{ job.workflow_sha }}
-          path: .platform-reusable-workflows
-          persist-credentials: false
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ inputs.node_version }}
-      - name: Audit npm lockfile
-        env:
-          FAIL_ON_SEVERITY: ${{ inputs.fail_on_severity }}
-          WORKING_DIRECTORY: ${{ inputs.working_directory }}
-        run: |
-          node .platform-reusable-workflows/scripts/security/dependency-scan.mjs \
-            "${FAIL_ON_SEVERITY}" \
-            "${WORKING_DIRECTORY}"
+      # Pinned to an immutable commit SHA (never @main or a branch for a
+      # published workflow). scripts/release/pin-composites.sh rewrites this to
+      # the SHA that holds the composite action and its scripts, keeping the
+      # workflow, the action and the scripts on one coherent revision.
+      - name: Run platform dependency scan
+        uses: s5micheldevops/platform-reusable-workflows/actions/dependency-scan@aab03490681a1cc53d456286c85f324bb8c96a08 # pin:dependency-scan
+        with:
+          fail_on_severity: ${{ inputs.fail_on_severity }}
+          working_directory: ${{ inputs.working_directory }}

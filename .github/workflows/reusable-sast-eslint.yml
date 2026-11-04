@@ -22,39 +22,11 @@ jobs:
     steps:
       - name: Checkout caller repository
         uses: actions/checkout@v4
-      - name: Checkout matching platform workflow revision
-        uses: actions/checkout@v4
+      # Pinned to an immutable commit SHA (never @main or a branch for a
+      # published workflow). scripts/release/pin-composites.sh rewrites this to
+      # the SHA that holds the composite action and its scripts, keeping the
+      # workflow, the action and the scripts on one coherent revision.
+      - name: Run platform SAST
+        uses: s5micheldevops/platform-reusable-workflows/actions/sast-javascript-typescript@aab03490681a1cc53d456286c85f324bb8c96a08 # pin:sast-javascript-typescript
         with:
-          repository: ${{ job.workflow_repository }}
-          ref: ${{ job.workflow_sha }}
-          path: .platform-reusable-workflows
-          persist-credentials: false
-      - name: Validate working directory
-        env:
-          WORKING_DIRECTORY: ${{ inputs.working_directory }}
-        run: |
-          case "${WORKING_DIRECTORY}" in
-            -*)
-              echo "SAST configuration error: working_directory must not begin with '-': ${WORKING_DIRECTORY}"
-              exit 2
-              ;;
-          esac
-
-          if [ ! -d "${WORKING_DIRECTORY}" ]; then
-            echo "SAST configuration error: working_directory does not exist or is not a directory: ${WORKING_DIRECTORY}"
-            exit 2
-          fi
-      - name: Install exact Semgrep CE version
-        run: python -m pip install --disable-pip-version-check --no-input "semgrep==1.176.1"
-      - name: Run blocking JavaScript and TypeScript security scan
-        env:
-          WORKING_DIRECTORY: ${{ inputs.working_directory }}
-        run: |
-          semgrep scan \
-            --config .platform-reusable-workflows/security/semgrep/javascript-typescript-security-v1.yml \
-            --error \
-            --severity ERROR \
-            --exclude .platform-reusable-workflows \
-            --exclude tests/security-workflows/fixtures \
-            -- \
-            "${WORKING_DIRECTORY}"
+          working_directory: ${{ inputs.working_directory }}

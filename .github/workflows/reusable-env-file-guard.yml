@@ -14,12 +14,9 @@ jobs:
     steps:
       - name: Checkout caller repository
         uses: actions/checkout@v4
-      - name: Checkout matching platform workflow revision
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ job.workflow_repository }}
-          ref: ${{ job.workflow_sha }}
-          path: .platform-reusable-workflows
-          persist-credentials: false
-      - name: Inspect tracked environment filenames
-        run: node .platform-reusable-workflows/scripts/security/environment-guard.mjs .
+      # Pinned to an immutable commit SHA (never @main or a branch for a
+      # published workflow). scripts/release/pin-composites.sh rewrites this to
+      # the SHA that holds the composite action and its scripts, keeping the
+      # workflow, the action and the scripts on one coherent revision.
+      - name: Run platform environment file guard
+        uses: s5micheldevops/platform-reusable-workflows/actions/environment-file-guard@aab03490681a1cc53d456286c85f324bb8c96a08 # pin:environment-file-guard
