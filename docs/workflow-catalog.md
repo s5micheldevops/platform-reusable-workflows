@@ -23,6 +23,17 @@ Production repositories should prefer version-pinned references such as `@v0.1.0
 | Platform Gitleaks Scan | `actions/gitleaks-scan/action.yml` | Wraps `gitleaks/gitleaks-action@v2`. | Added |
 | Validate Branch Name | `actions/validate-branch-name/action.yml` | Validates branch names against default or custom regex rules. | Added |
 | Static Site Quality | `actions/static-site-quality/action.yml` | Checks `index.html`, conflict markers, secret-like strings, assets, and large files. | Added |
+| npm Dependency Scan | `actions/dependency-scan/action.yml` | Runs `npm audit` from the lockfile and fails at the configured severity. | Added (v0.5.0, planned) |
+| JavaScript and TypeScript SAST | `actions/sast-javascript-typescript/action.yml` | Runs Semgrep CE with the platform security ruleset. | Added (v0.5.0, planned) |
+| Environment File Guard | `actions/environment-file-guard/action.yml` | Blocks tracked `.env` files (allows documented templates). | Added (v0.5.0, planned) |
+
+## Versioning and Immutable SHA Pinning
+
+A reusable workflow cannot discover its own repository or ref at runtime (the `github` context always refers to the caller). To keep each security control reproducible, the three security reusable workflows do **not** reference their composite action with `@main` or a branch. Instead they pin it to a full 40-character commit SHA, written by `scripts/release/pin-composites.sh`. That script refuses any SHA whose tree does not contain both the composite `action.yml` and the script or config it runs, so the **workflow, the composite action and the scripts always share one immutable revision**.
+
+Inside each composite action, the bundled scripts and the Semgrep ruleset are located with `$GITHUB_ACTION_PATH` (the directory where GitHub checks the action out at the pinned SHA). This is why the action and its scripts can never drift apart.
+
+> **Status:** the three security workflows, their composite actions and the `v0.5.0` tag are **planned and not yet released**. Pin `@v0.5.0` only after that tag exists; until then the examples below describe the forthcoming release.
 
 ## Reusable npm Dependency Scan Workflow
 
@@ -45,7 +56,7 @@ The workflow requires only `contents: read` and no secrets. It fails for an inva
 ```yaml
 jobs:
   dependency-scan:
-    uses: s5micheldevops/platform-reusable-workflows/.github/workflows/reusable-dependency-scan.yml@main
+    uses: s5micheldevops/platform-reusable-workflows/.github/workflows/reusable-dependency-scan.yml@v0.5.0
     with:
       fail_on_severity: "high"
 ```
@@ -60,7 +71,7 @@ jobs:
 
 ### Purpose
 
-`.github/workflows/reusable-sast-eslint.yml` retains its historical filename for caller compatibility. Its version 1 SAST engine is Semgrep Community Edition, not ESLint. Semgrep is installed at exact version `1.176.1`, and the security rules are stored in this repository and loaded from the exact commit that defines the reusable workflow. Version 1 provides targeted rules for dynamic code execution, disabled TLS verification, MD5 hashing, and React `dangerouslySetInnerHTML`; it is not exhaustive SAST coverage.
+`.github/workflows/reusable-sast-eslint.yml` retains its historical filename for caller compatibility. Its version 1 SAST engine is Semgrep Community Edition, not ESLint. Semgrep is installed at exact version `1.176.1`, and the security rules are stored in this repository and loaded from the composite action via `$GITHUB_ACTION_PATH`. Because the reusable workflow pins that composite action to an immutable commit SHA, the ruleset and the workflow always resolve to one coherent revision. Version 1 provides targeted rules for dynamic code execution, disabled TLS verification, MD5 hashing, and React `dangerouslySetInnerHTML`; it is not exhaustive SAST coverage.
 
 ### Inputs
 
@@ -75,7 +86,7 @@ The workflow requires only `contents: read` and no secrets or Semgrep token. It 
 ```yaml
 jobs:
   sast:
-    uses: s5micheldevops/platform-reusable-workflows/.github/workflows/reusable-sast-eslint.yml@main
+    uses: s5micheldevops/platform-reusable-workflows/.github/workflows/reusable-sast-eslint.yml@v0.5.0
 ```
 
 ### Version 1 Limitations
@@ -102,7 +113,7 @@ The workflow requires only `contents: read`, has no inputs, and uses no secrets.
 ```yaml
 jobs:
   env-guard:
-    uses: s5micheldevops/platform-reusable-workflows/.github/workflows/reusable-env-file-guard.yml@main
+    uses: s5micheldevops/platform-reusable-workflows/.github/workflows/reusable-env-file-guard.yml@v0.5.0
 ```
 
 ### Version 1 Limitations
