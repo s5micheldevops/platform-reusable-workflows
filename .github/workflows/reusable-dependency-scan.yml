@@ -1,0 +1,45 @@
+name: Reusable - npm Dependency Scan
+
+on:
+  workflow_call:
+    inputs:
+      fail_on_severity:
+        type: string
+        required: false
+        default: "high"
+        description: "Minimum vulnerability severity that fails the scan: low, moderate, high, or critical."
+      node_version:
+        type: string
+        required: false
+        default: "20"
+        description: "Node.js version used to run npm audit."
+      working_directory:
+        type: string
+        required: false
+        default: "."
+        description: "Directory containing package.json and an npm lockfile."
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-scan:
+    name: npm Dependency Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout caller repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node_version }}
+      # Pinned to an immutable commit SHA (never @main or a branch for a
+      # published workflow). scripts/release/pin-composites.sh rewrites this to
+      # the SHA that holds the composite action and its scripts, keeping the
+      # workflow, the action and the scripts on one coherent revision.
+      - name: Run platform dependency scan
+        uses: s5micheldevops/platform-reusable-workflows/actions/dependency-scan@aab03490681a1cc53d456286c85f324bb8c96a08 # pin:dependency-scan
+        with:
+          fail_on_severity: ${{ inputs.fail_on_severity }}
+          working_directory: ${{ inputs.working_directory }}

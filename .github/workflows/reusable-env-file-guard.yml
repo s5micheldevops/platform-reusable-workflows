@@ -1,0 +1,22 @@
+name: Reusable - Environment File Guard
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  environment-file-guard:
+    name: Environment File Guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout caller repository
+        uses: actions/checkout@v4
+      # Pinned to an immutable commit SHA (never @main or a branch for a
+      # published workflow). scripts/release/pin-composites.sh rewrites this to
+      # the SHA that holds the composite action and its scripts, keeping the
+      # workflow, the action and the scripts on one coherent revision.
+      - name: Run platform environment file guard
+        uses: s5micheldevops/platform-reusable-workflows/actions/environment-file-guard@aab03490681a1cc53d456286c85f324bb8c96a08 # pin:environment-file-guard

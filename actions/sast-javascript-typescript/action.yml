@@ -1,0 +1,52 @@
+name: "Platform JavaScript and TypeScript SAST"
+description: "Runs Semgrep Community Edition with the platform security ruleset against the caller repository."
+
+inputs:
+  working_directory:
+    description: "Directory containing JavaScript, TypeScript, or React source to scan."
+    required: false
+    default: "."
+
+runs:
+  using: "composite"
+  steps:
+    - name: Validate working directory
+      shell: bash
+      env:
+        WORKING_DIRECTORY: ${{ inputs.working_directory }}
+      run: |
+        set -euo pipefail
+
+        # Reject values that argument-parsers could read as a flag.
+        case "${WORKING_DIRECTORY}" in
+          -*)
+            echo "SAST configuration error: working_directory must not begin with '-': ${WORKING_DIRECTORY}"
+            exit 2
+            ;;
+        esac
+
+        if [ ! -d "${WORKING_DIRECTORY}" ]; then
+          echo "SAST configuration error: working_directory does not exist or is not a directory: ${WORKING_DIRECTORY}"
+          exit 2
+        fi
+
+    - name: Install exact Semgrep CE version
+      shell: bash
+      run: python -m pip install --disable-pip-version-check --no-input "semgrep==1.176.1"
+
+    - name: Run blocking JavaScript and TypeScript security scan
+      shell: bash
+      env:
+        WORKING_DIRECTORY: ${{ inputs.working_directory }}
+      run: |
+        set -euo pipefail
+
+        # The ruleset ships with this action, so GITHUB_ACTION_PATH keeps the
+        # config and the action version coherent regardless of the called ref.
+        semgrep scan \
+          --config "${GITHUB_ACTION_PATH}/../../security/semgrep/javascript-typescript-security-v1.yml" \
+          --error \
+          --severity ERROR \
+          --exclude tests/security-workflows/fixtures \
+          -- \
+          "${WORKING_DIRECTORY}"

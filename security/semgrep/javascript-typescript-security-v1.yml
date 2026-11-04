@@ -1,0 +1,37 @@
+rules:
+  - id: platform.javascript.security.detect-eval
+    message: Avoid eval(), which can execute attacker-controlled JavaScript.
+    severity: ERROR
+    languages: [javascript, typescript]
+    pattern: eval(...)
+    metadata: { category: security, technology: [javascript, typescript], cwe: CWE-95 }
+
+  - id: platform.javascript.security.detect-function-constructor
+    message: Avoid the Function constructor, which can execute attacker-controlled JavaScript.
+    severity: ERROR
+    languages: [javascript, typescript]
+    pattern: new Function(...)
+    metadata: { category: security, technology: [javascript, typescript], cwe: CWE-95 }
+
+  - id: platform.node.security.disabled-tls-verification
+    message: TLS certificate verification must not be disabled.
+    severity: ERROR
+    languages: [javascript, typescript]
+    pattern: "{..., rejectUnauthorized: false, ...}"
+    metadata: { category: security, technology: [node.js], cwe: CWE-295 }
+
+  - id: platform.node.security.weak-md5-hash
+    message: MD5 is not appropriate for security-sensitive hashing.
+    severity: ERROR
+    languages: [javascript, typescript]
+    pattern-either:
+      - pattern: $CRYPTO.createHash("md5")
+      - pattern: $CRYPTO.createHash('md5')
+    metadata: { category: security, technology: [node.js], cwe: CWE-328 }
+
+  - id: platform.react.security.dangerously-set-inner-html
+    message: Review dangerouslySetInnerHTML usage; untrusted HTML can cause cross-site scripting.
+    severity: ERROR
+    languages: [javascript, typescript]
+    pattern: "<$ELEMENT ... dangerouslySetInnerHTML={{__html: $HTML}} ... />"
+    metadata: { category: security, technology: [react], cwe: CWE-79 }

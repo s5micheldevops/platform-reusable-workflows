@@ -12,6 +12,9 @@ Production repositories should prefer version-pinned references such as `@v0.1.0
 | Branch Naming Validation | `.github/workflows/reusable-branch-naming.yml` | Enforce branch naming standards. | Added |
 | Static Site Quality | `.github/workflows/reusable-static-site-quality.yml` | Run basic quality checks for plain static websites. | Added |
 | Playwright Smoke Test | `.github/workflows/reusable-playwright-smoke.yml` | Run lightweight browser smoke checks against a deployed website. | Added |
+| npm Dependency Scan | `.github/workflows/reusable-dependency-scan.yml` | Audit npm lockfiles and block vulnerabilities at a configured severity threshold. | Added |
+| Targeted JavaScript and TypeScript SAST | `.github/workflows/reusable-sast-eslint.yml` | Run targeted blocking Semgrep CE security rules with a platform-versioned ruleset. | Added |
+| Environment File Guard | `.github/workflows/reusable-env-file-guard.yml` | Reject prohibited tracked `.env` filenames without reading file contents. | Added |
 
 ## Composite Actions
 
@@ -20,6 +23,104 @@ Production repositories should prefer version-pinned references such as `@v0.1.0
 | Platform Gitleaks Scan | `actions/gitleaks-scan/action.yml` | Wraps `gitleaks/gitleaks-action@v2`. | Added |
 | Validate Branch Name | `actions/validate-branch-name/action.yml` | Validates branch names against default or custom regex rules. | Added |
 | Static Site Quality | `actions/static-site-quality/action.yml` | Checks `index.html`, conflict markers, secret-like strings, assets, and large files. | Added |
+| npm Dependency Scan | `actions/dependency-scan/action.yml` | Runs `npm audit` from the lockfile and fails at the configured severity. | Added (v0.5.0, planned) |
+| JavaScript and TypeScript SAST | `actions/sast-javascript-typescript/action.yml` | Runs Semgrep CE with the platform security ruleset. | Added (v0.5.0, planned) |
+| Environment File Guard | `actions/environment-file-guard/action.yml` | Blocks tracked `.env` files (allows documented templates). | Added (v0.5.0, planned) |
+
+## Versioning and Immutable SHA Pinning
+
+A reusable workflow cannot discover its own repository or ref at runtime (the `github` context always refers to the caller). To keep each security control reproducible, the three security reusable workflows do **not** reference their composite action with `@main` or a branch. Instead they pin it to a full 40-character commit SHA, written by `scripts/release/pin-composites.sh`. That script refuses any SHA whose tree does not contain both the composite `action.yml` and the script or config it runs, so the **workflow, the composite action and the scripts always share one immutable revision**.
+
+Inside each composite action, the bundled scripts and the Semgrep ruleset are located with `$GITHUB_ACTION_PATH` (the directory where GitHub checks the action out at the pinned SHA). This is why the action and its scripts can never drift apart.
+
+> **Status:** the three security workflows, their composite actions and the `v0.5.0` tag are **planned and not yet released**. Pin `@v0.5.0` only after that tag exists; until then the examples below describe the forthcoming release.
+
+## Reusable npm Dependency Scan Workflow
+
+### Purpose
+
+`.github/workflows/reusable-dependency-scan.yml` runs `npm audit` directly from `package-lock.json` or `npm-shrinkwrap.json`. It does not install dependencies, run dependency scripts, or modify the lockfile.
+
+### Inputs
+
+| Input | Type | Default | Description |
+| --- | --- | --- | --- |
+| `fail_on_severity` | string | `high` | Minimum blocking severity: `low`, `moderate`, `high`, or `critical`. |
+| `node_version` | string | `20` | Node.js version used to run npm. |
+| `working_directory` | string | `.` | Directory containing `package.json` and an npm lockfile. |
+
+### Permissions and Blocking Behavior
+
+The workflow requires only `contents: read` and no secrets. It fails for an invalid input, missing working directory, missing `package.json`, missing npm lockfile, scanner error, or vulnerability meeting the configured threshold.
+
+```yaml
+jobs:
+  dependency-scan:
+    uses: s5micheldevops/platform-reusable-workflows/.github/workflows/reusable-dependency-scan.yml@v0.5.0
+    with:
+      fail_on_severity: "high"
+```
+
+### Version 1 Limitations
+
+- npm projects only; Yarn and pnpm lockfiles are not supported.
+- Audit findings depend on the advisory data returned by the configured npm registry.
+- The workflow reports findings but does not run `npm audit fix`.
+
+## Reusable Targeted JavaScript and TypeScript SAST Workflow
+
+### Purpose
+
+`.github/workflows/reusable-sast-eslint.yml` retains its historical filename for caller compatibility. Its version 1 SAST engine is Semgrep Community Edition, not ESLint. Semgrep is installed at exact version `1.176.1`, and the security rules are stored in this repository and loaded from the composite action via `$GITHUB_ACTION_PATH`. Because the reusable workflow pins that composite action to an immutable commit SHA, the ruleset and the workflow always resolve to one coherent revision. Version 1 provides targeted rules for dynamic code execution, disabled TLS verification, MD5 hashing, and React `dangerouslySetInnerHTML`; it is not exhaustive SAST coverage.
+
+### Inputs
+
+| Input | Type | Default | Description |
+| --- | --- | --- | --- |
+| `working_directory` | string | `.` | Directory containing JavaScript, TypeScript, or React source. |
+
+### Permissions and Blocking Behavior
+
+The workflow requires only `contents: read` and no secrets or Semgrep token. It performs no SARIF upload or pull-request write. A selected security finding, invalid rule configuration, missing working directory, or engine failure returns a non-zero status.
+
+```yaml
+jobs:
+  sast:
+    uses: s5micheldevops/platform-reusable-workflows/.github/workflows/reusable-sast-eslint.yml@v0.5.0
+```
+
+### Version 1 Limitations
+
+- The curated rules cover selected blocking JavaScript, TypeScript, Node.js, and React patterns; they are not a substitute for security review or a full commercial SAST ruleset.
+- Results are emitted to job logs only.
+- The compatibility filename mentions ESLint even though the engine is Semgrep CE.
+
+## Reusable Environment File Guard Workflow
+
+### Purpose
+
+`.github/workflows/reusable-env-file-guard.yml` applies a filename policy to files returned by `git ls-files -z`. It checks every repository directory without opening or printing file contents.
+
+### Filename Policy
+
+- Allowed exact basenames, case-insensitively: `.env.example`, `.env.sample`, `.env.template`.
+- Prohibited basenames, case-insensitively: `.env` and every other `.env.*` variant.
+
+### Permissions and Blocking Behavior
+
+The workflow requires only `contents: read`, has no inputs, and uses no secrets. It fails when any prohibited tracked filename is found or tracked files cannot be enumerated.
+
+```yaml
+jobs:
+  env-guard:
+    uses: s5micheldevops/platform-reusable-workflows/.github/workflows/reusable-env-file-guard.yml@v0.5.0
+```
+
+### Version 1 Limitations
+
+- Only tracked files are inspected; local untracked files remain the responsibility of `.gitignore` and developer tooling.
+- Only the three exact documented template basenames are exempted.
+- This filename policy complements Gitleaks and does not inspect file values for secrets.
 
 ## Reusable Gitleaks Workflow
 

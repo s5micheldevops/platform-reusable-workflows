@@ -1,0 +1,15 @@
+name: "Platform Environment File Guard"
+description: "Blocks tracked .env files (allows .env.example, .env.sample, .env.template) in the caller repository."
+
+runs:
+  using: "composite"
+  steps:
+    - name: Inspect tracked environment filenames
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        # The guard inspects the caller repository that the workflow checked
+        # out (current working directory). The script itself travels with this
+        # action, so GITHUB_ACTION_PATH keeps it coherent with the action ref.
+        node "${GITHUB_ACTION_PATH}/../../scripts/security/environment-guard.mjs" .
