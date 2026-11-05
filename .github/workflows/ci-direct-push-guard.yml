@@ -1,0 +1,68 @@
+name: CI - Direct Push Guard
+
+# Real CI for the Direct Push Guard implementation (classifier + composite +
+# reusable workflow). Runs the deterministic unit tests and static validation.
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate Direct Push Guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Set up Node.js
+        uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+        with:
+          node-version: "20"
+
+      - name: Unit tests (classifier)
+        run: node --test tests/direct-push-guard/
+
+      - name: JavaScript syntax check
+        run: |
+          set -euo pipefail
+          for f in scripts/governance/*.mjs; do
+            echo "node --check $f"
+            node --check "$f"
+          done
+
+      - name: YAML syntax validation
+        run: |
+          set -euo pipefail
+          # Ruby/psych is preinstalled on ubuntu-latest; no extra dependency.
+          while IFS= read -r f; do
+            ruby -ryaml -e 'YAML.load_file(ARGV[0])' "$f" || { echo "Invalid YAML: $f"; exit 1; }
+            echo "OK YAML: $f"
+          done < <(git ls-files '*.yml' '*.yaml')
+
+      - name: Composite action metadata validation
+        run: |
+          set -euo pipefail
+          for a in actions/*/action.yml; do
+            ruby -ryaml -e 'y=YAML.load_file(ARGV[0]); abort("missing name: "+ARGV[0]) unless y["name"]; abort("missing runs: "+ARGV[0]) unless y["runs"]; abort("not composite: "+ARGV[0]) unless y["runs"] && y["runs"]["using"] == "composite"' "$a"
+            echo "OK composite: $a"
+          done
+
+      - name: Install actionlint (pinned)
+        run: |
+          set -euo pipefail
+          go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: actionlint (Direct Push Guard workflows)
+        run: |
+          set -euo pipefail
+          # Scope to the workflows introduced here; disable the shellcheck
+          # integration to avoid failing on unrelated pre-existing style.
+          actionlint -shellcheck= -color \
+            .github/workflows/reusable-direct-push-guard.yml \
+            .github/workflows/ci-direct-push-guard.yml

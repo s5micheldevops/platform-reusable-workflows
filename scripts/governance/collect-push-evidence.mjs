@@ -63,6 +63,7 @@ if (!deleted && !created && operationalBranches.includes(branch)) {
             state: p.state,
             merged: p.merged_at != null,
             baseRef: p.base?.ref,
+            mergeCommitSha: p.merge_commit_sha,
           })),
         });
       } catch {
@@ -76,7 +77,7 @@ if (!deleted && !created && operationalBranches.includes(branch)) {
 }
 
 const result = classify({
-  branch, operationalBranches, mode, created, deleted, forced, actor, allowedActors,
+  branch, headSha: after, operationalBranches, mode, created, deleted, forced, actor, allowedActors,
   rangeComplete, prLookupComplete, commits,
 });
 

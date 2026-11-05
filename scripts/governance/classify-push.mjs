@@ -16,6 +16,7 @@
  * @property {string} state      "open" | "closed"
  * @property {boolean} merged    true when the PR is merged
  * @property {string} baseRef    the PR base branch
+ * @property {string} [mergeCommitSha] the PR's merge_commit_sha (merge/squash/rebase result)
  *
  * @typedef {Object} CommitEvidence
  * @property {string} sha
@@ -23,6 +24,7 @@
  *
  * @typedef {Object} ClassifyInput
  * @property {string} branch                 pushed branch (github.ref_name)
+ * @property {string} [headSha]              pushed HEAD commit (github.sha / after)
  * @property {string[]} operationalBranches  branches to audit (e.g. ["main","staging"])
  * @property {"strict"|"audit"} mode
  * @property {boolean} created               branch-creation push
@@ -116,8 +118,20 @@ export function classify(input) {
   }
   const attribution = { total: commits.length, attributed: attributed.length, unattributed: unattributed.length, unattributedShas: unattributed };
 
-  if (unattributed.length === 0)
-    return decide(CLASSIFICATION.AUTHORIZED_PR_MERGE, "Every pushed commit is attributable to a PR merged into this branch.", attribution);
+  if (unattributed.length === 0) {
+    // Reliability guard: a commit being ASSOCIATED with a merged PR does not by
+    // itself prove THIS push was a fresh authorized merge (e.g. a direct re-push
+    // of commits that belonged to an already-merged PR). Require the pushed HEAD
+    // to equal the merge_commit_sha of a PR merged into this branch — which it
+    // is for merge-commit, squash and rebase merges at merge time.
+    const mergeShas = new Set();
+    for (const c of commits)
+      for (const p of Array.isArray(c.pulls) ? c.pulls : [])
+        if (isMergedInto(p, branch) && p.mergeCommitSha) mergeShas.add(p.mergeCommitSha);
+    if (input.headSha && mergeShas.has(input.headSha))
+      return decide(CLASSIFICATION.AUTHORIZED_PR_MERGE, "Every pushed commit maps to a merged PR and the pushed HEAD is that PR's merge commit.", attribution);
+    return decide(CLASSIFICATION.AMBIGUOUS, "All pushed commits map to merged PRs, but the pushed HEAD is not a recorded PR merge commit (possible replay/direct push of already-merged commits).", attribution);
+  }
   if (attributed.length === 0)
     return decide(CLASSIFICATION.DIRECT_PUSH, "No pushed commit is attributable to a merged PR into this branch.", attribution);
   return decide(CLASSIFICATION.MIXED, "Some pushed commits are not attributable to a merged PR into this branch.", attribution);
