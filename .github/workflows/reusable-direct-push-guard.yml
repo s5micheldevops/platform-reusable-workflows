@@ -1,0 +1,51 @@
+name: Reusable - Direct Push Guard
+
+# DETECTIVE / AUDIT control (NOT preventive). It runs AFTER a push is accepted
+# by GitHub, so it cannot reject the push and cannot stop Vercel from starting a
+# deployment. It reports whether a push to an operational branch is attributable
+# to a merged pull request, or looks like a direct/force push.
+on:
+  workflow_call:
+    inputs:
+      operational_branches:
+        type: string
+        required: false
+        default: "main staging"
+        description: "Space-separated branches to audit."
+      mode:
+        type: string
+        required: false
+        default: "audit"
+        description: "'audit' (report only) or 'strict' (fail on confirmed/inconclusive violations)."
+      allowed_actors:
+        type: string
+        required: false
+        default: ""
+        description: "Space-separated GitHub logins allowed to push directly (documented exceptions)."
+      max_commits:
+        type: string
+        required: false
+        default: "250"
+        description: "Max commits inspected before the pushed range is marked incomplete."
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  direct-push-guard:
+    name: Direct Push Guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # RELEASE NOTE: before publishing v0.6.0, pin this composite reference to an
+      # immutable commit SHA (same coherence mechanism as the v0.5.0 security
+      # workflows / scripts/release/pin-composites.sh). '@main' is a development
+      # reference only.
+      - name: Run platform direct push guard
+        uses: s5micheldevops/platform-reusable-workflows/actions/direct-push-guard@main
+        with:
+          operational_branches: ${{ inputs.operational_branches }}
+          mode: ${{ inputs.mode }}
+          allowed_actors: ${{ inputs.allowed_actors }}
+          max_commits: ${{ inputs.max_commits }}

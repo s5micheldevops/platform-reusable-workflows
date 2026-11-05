@@ -1,0 +1,29 @@
+# EXAMPLE caller — documentation only.
+#
+# Intended location in a CONSUMING repository (e.g. sawaconna/sawa-homepage):
+#   .github/workflows/direct-push-guard.yml
+#
+# This file is NOT an active workflow in the platform repository (it lives under
+# docs/examples/), and this PR does NOT install it into any application repo.
+#
+# Pin the reusable workflow to a published, immutable release. v0.6.0 is PLANNED
+# and NOT yet released — the @v0.6.0 below is a placeholder for that future tag.
+name: Governance - Direct Push Guard
+
+on:
+  push:
+    branches:
+      - main
+      - staging
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  direct-push-guard:
+    uses: s5micheldevops/platform-reusable-workflows/.github/workflows/reusable-direct-push-guard.yml@v0.6.0  # PLACEHOLDER: future release, not published
+    with:
+      operational_branches: "main staging"
+      mode: "audit"        # start in audit; switch to "strict" once validated
+      # allowed_actors: "release-bot"   # optional documented exceptions
