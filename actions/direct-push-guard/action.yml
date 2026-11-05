@@ -1,0 +1,44 @@
+name: "Platform Direct Push Guard"
+description: "Detective audit of pushes to operational branches: merged-PR vs direct push vs force push, with explicit ambiguous classification."
+
+inputs:
+  operational_branches:
+    description: "Space-separated branches to audit (e.g. 'main staging')."
+    required: false
+    default: "main staging"
+  mode:
+    description: "'audit' (report only, never fails) or 'strict' (fail on confirmed/inconclusive violations)."
+    required: false
+    default: "audit"
+  allowed_actors:
+    description: "Space-separated GitHub logins allowed to push directly (documented exceptions). Reported, non-blocking."
+    required: false
+    default: ""
+  max_commits:
+    description: "Maximum commits to inspect in the pushed range before marking the range incomplete."
+    required: false
+    default: "250"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Classify push against merged-PR evidence
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        DPG_BRANCH: ${{ github.ref_name }}
+        DPG_BEFORE: ${{ github.event.before }}
+        DPG_AFTER: ${{ github.sha }}
+        DPG_CREATED: ${{ github.event.created }}
+        DPG_DELETED: ${{ github.event.deleted }}
+        DPG_FORCED: ${{ github.event.forced }}
+        DPG_ACTOR: ${{ github.actor }}
+        DPG_OPERATIONAL: ${{ inputs.operational_branches }}
+        DPG_MODE: ${{ inputs.mode }}
+        DPG_ALLOWED_ACTORS: ${{ inputs.allowed_actors }}
+        DPG_MAX_COMMITS: ${{ inputs.max_commits }}
+      run: |
+        set -euo pipefail
+        # Scripts ship with this action; GITHUB_ACTION_PATH keeps them coherent
+        # with the pinned action revision (classify is pure + unit-tested).
+        node "${GITHUB_ACTION_PATH}/../../scripts/governance/collect-push-evidence.mjs"
