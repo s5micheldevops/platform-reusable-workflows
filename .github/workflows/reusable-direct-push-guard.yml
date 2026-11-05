@@ -38,12 +38,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      # RELEASE NOTE: before publishing v0.6.0, pin this composite reference to an
-      # immutable commit SHA (same coherence mechanism as the v0.5.0 security
-      # workflows / scripts/release/pin-composites.sh). '@main' is a development
-      # reference only.
+      # Pinned to an immutable commit SHA that contains the composite action.
+      # (Pre-release integration pin on the feature branch; at the v0.6.0 release
+      # this is re-pinned to the release commit via scripts/release/pin-composites.)
       - name: Run platform direct push guard
-        uses: s5micheldevops/platform-reusable-workflows/actions/direct-push-guard@main
+        uses: s5micheldevops/platform-reusable-workflows/actions/direct-push-guard@fffd1a1e3c5bb7d09dbf488f4bdb9b137666a73a # pin:direct-push-guard
         with:
           operational_branches: ${{ inputs.operational_branches }}
           mode: ${{ inputs.mode }}
