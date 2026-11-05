@@ -44,6 +44,14 @@ permissions:
 No secrets are used beyond the automatic `GITHUB_TOKEN`. The workflow does not
 check out or execute code from the pushed commits.
 
+**These permissions are required, not just recommended.** A reusable workflow
+**cannot elevate** the `GITHUB_TOKEN` beyond what the caller grants. If the
+caller omits `pull-requests: read`, GitHub refuses to start the job
+(`startup_failure`) because the called workflow declares a permission the caller
+did not grant — the guard never runs (it does **not** silently degrade to
+`AMBIGUOUS`). Always grant both `contents: read` and `pull-requests: read` in the
+caller.
+
 ## Caller example
 See [`docs/examples/direct-push-guard.caller.yml`](examples/direct-push-guard.caller.yml).
 Pin the reusable workflow to a published immutable release (tag/SHA).
@@ -96,6 +104,12 @@ proof of authorization.
 | `AMBIGUOUS` (truncated) | Push range > 250 commits | Expected for very large pushes; review manually. |
 | `DIRECT_PUSH` on a legitimate merge | Squash/rebase association not yet indexed | Re-run; verify the PR actually merged into this branch. |
 | `BRANCH_CREATED` | Operational branch (re)created | Review manually. |
+| Job `startup_failure` (guard never runs) | Caller granted fewer permissions than the reusable workflow requires (usually missing `pull-requests: read`) | Add `pull-requests: read` to the caller. This is a permission mismatch, not an `AMBIGUOUS` result. |
+
+## Testing: unit tests vs live integration
+- **Unit tests** (`tests/direct-push-guard/`, mocked GitHub API, deterministic) cover every classification including the `AMBIGUOUS` paths (missing permissions, rate limiting, truncated range, non-merge-commit HEAD). These are **simulated**.
+- **Live integration** (private disposable repo) has demonstrated real GitHub Actions runs for `DIRECT_PUSH`, `AUTHORIZED_PR_MERGE`, multi-commit `DIRECT_PUSH`, `BRANCH_CREATED`, and audit-vs-strict exit codes.
+- The **runtime `AMBIGUOUS`** path has **not** been demonstrated by a successful live fault-injection run: a caller lacking `pull-requests: read` yields `startup_failure` (above), not a live `AMBIGUOUS`. Treat `AMBIGUOUS` as **unit-test-validated only** until a non-permission live fault (e.g. simulated rate limiting) is exercised.
 
 ## Vercel deployment limitation
 This control is independent of Vercel. It **cannot** stop Vercel from building
